@@ -1,0 +1,6 @@
+{
+  "name": "Art for Climate — Leuven 2030 Kunstveiling",
+  "description": "Live kunstveiling georganiseerd door Leuven 2030 in M Leuven ten voordele van het Leuvens Klimaatfonds. Kunst vandaag. Impact morgen.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

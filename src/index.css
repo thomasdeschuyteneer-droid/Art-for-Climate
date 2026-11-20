@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "titillium-web", "Titillium Web", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "PT Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-l2030-teal: #19706D;
+  --color-l2030-cadet: #3C7F90;
+  --color-l2030-dark-green: #1E5941;
+  --color-l2030-lime: #B4C232;
+  --color-l2030-sage: #F0F3E1;
+  --color-l2030-alice: #DEE9EC;
+  --color-l2030-light-blue: #92CBDA;
+  --color-l2030-smoke: #F7F7F7;
+  --color-l2030-slate: #363E49;
+  --color-l2030-muted: #5D6C7B;
+  --color-l2030-gainsboro: #E5E5E5;
+  --color-l2030-brown: #923636;
+}
+
+:root {
+  --white-smoke: #f7f7f7;
+  --dark-slate-grey: #363e49;
+  --teal: #19706d;
+  --cadet-blue: #3c7f90;
+  --yellow-green: #b4c232;
+  --white: #ffffff;
+  --alice-blue: #dee9ec;
+  --gainsboro: #e5e5e5;
+  --dark-green: #1e5941;
+  --f0f3e1: #f0f3e1;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: #363E49;
+    background-color: #F7F7F7;
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-break-inside-avoid {
+    break-inside: avoid;
+  }
+}
