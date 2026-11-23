@@ -1,15 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
+  Award,
+  CheckCircle2,
   Download,
   Edit3,
   FileText,
   FileUp,
+  Globe,
   ImagePlus,
   Plus,
   Printer,
   RotateCcw,
+  Search,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
@@ -30,7 +35,7 @@ import { QrCodeCard } from './QrCodeCard';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { InvoiceModal } from './InvoiceModal';
 
-type AdminTab = 'inventory' | 'billing' | 'import' | 'qrcodes' | 'ledger';
+type AdminTab = 'overview' | 'inventory' | 'billing' | 'import' | 'qrcodes' | 'ledger';
 
 const EMPTY_FORM = {
   title: '',
@@ -78,10 +83,13 @@ export function AdminPanel() {
     fetchBillingData,
     updateBillingProfile,
     updateOrganizerSettings,
+    updateAuctionState,
     resetAuction,
   } = useAuction();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('inventory');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [overviewSearch, setOverviewSearch] = useState('');
+  const [overviewFilter, setOverviewFilter] = useState<'all' | 'leading' | 'with_bids'>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<Artwork | null>(null);
   const [formState, setFormState] = useState(EMPTY_FORM);
@@ -98,6 +106,11 @@ export function AdminPanel() {
   } | null>(null);
   const [editingBilling, setEditingBilling] = useState<BidderBillingProfile | null>(null);
   const [settingsForm, setSettingsForm] = useState(organizerSettings);
+  const [publicDomainInput, setPublicDomainInput] = useState(auctionState?.publicBaseUrl || '');
+
+  useEffect(() => {
+    setPublicDomainInput(auctionState?.publicBaseUrl || '');
+  }, [auctionState?.publicBaseUrl]);
 
   useEffect(() => {
     void fetchBillingData();
@@ -132,8 +145,99 @@ export function AdminPanel() {
     for (const b of bidders) set.add(b.bidderNumber);
     for (const p of billingProfiles) set.add(p.bidderNumber);
     for (const num of wonLotsByBidder.keys()) set.add(num);
+    for (const bid of bids) set.add(bid.bidderNumber);
     return Array.from(set).sort();
-  }, [bidders, billingProfiles, wonLotsByBidder]);
+  }, [bidders, billingProfiles, bids, wonLotsByBidder]);
+
+  const artworkById = useMemo(() => {
+    const map = new Map<string, Artwork>();
+    for (const lot of artworks) {
+      map.set(lot.id, lot);
+    }
+    return map;
+  }, [artworks]);
+
+  const bidsByBidder = useMemo(() => {
+    const map = new Map<string, typeof bids>();
+    for (const bid of bids) {
+      const list = map.get(bid.bidderNumber) ?? [];
+      list.push(bid);
+      map.set(bid.bidderNumber, list);
+    }
+    return map;
+  }, [bids]);
+
+  const lotsWithBids = useMemo(() => {
+    return artworks
+      .filter((lot) => lot.currentBid > 0 && lot.highestBidderNumber)
+      .sort((a, b) => {
+        if (a.status === 'sold' && b.status !== 'sold') return -1;
+        if (a.status !== 'sold' && b.status === 'sold') return 1;
+        return a.lotNumber - b.lotNumber;
+      });
+  }, [artworks]);
+
+  const totalRealizedAmount = useMemo(() => {
+    return lotsWithBids.reduce((sum, lot) => sum + lot.currentBid, 0);
+  }, [lotsWithBids]);
+
+  const leadingBiddersCount = wonLotsByBidder.size;
+
+  const normalizedQuery = overviewSearch.trim().toLowerCase();
+
+  const filteredBidderNumbers = useMemo(() => {
+    return allKnownBidderNumbers.filter((num) => {
+      const profile = billingByBidderNumber.get(num);
+      const bidderBids = bidsByBidder.get(num) ?? [];
+      const leadingLots = wonLotsByBidder.get(num) ?? [];
+
+      if (overviewFilter === 'leading' && leadingLots.length === 0) return false;
+      if (overviewFilter === 'with_bids' && bidderBids.length === 0 && leadingLots.length === 0) return false;
+
+      if (!normalizedQuery) return true;
+      const haystack = [
+        num,
+        profile?.name || '',
+        profile?.companyName || '',
+        profile?.vatNumber || '',
+        profile?.email || '',
+        profile?.city || '',
+        ...bidderBids.map((b) => `${formatLotNumber(b.lotNumber)} ${b.artworkTitle}`),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [
+    allKnownBidderNumbers,
+    billingByBidderNumber,
+    bidsByBidder,
+    normalizedQuery,
+    overviewFilter,
+    wonLotsByBidder,
+  ]);
+
+  const filteredLotsWithBids = useMemo(() => {
+    if (!normalizedQuery) return lotsWithBids;
+    return lotsWithBids.filter((lot) => {
+      const profile = lot.highestBidderNumber
+        ? billingByBidderNumber.get(lot.highestBidderNumber)
+        : undefined;
+      const haystack = [
+        formatLotNumber(lot.lotNumber),
+        lot.title,
+        lot.artist,
+        lot.highestBidderNumber || '',
+        profile?.name || '',
+        profile?.companyName || '',
+        profile?.vatNumber || '',
+        profile?.city || '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [billingByBidderNumber, lotsWithBids, normalizedQuery]);
 
   const openCreateModal = () => {
     setEditingLot(null);
@@ -298,7 +402,31 @@ export function AdminPanel() {
       };
     });
 
+    const buyerRows = lotsWithBids.map((lot) => {
+      const profile = lot.highestBidderNumber
+        ? billingByBidderNumber.get(lot.highestBidderNumber)
+        : undefined;
+      return {
+        Lotnummer: formatLotNumber(lot.lotNumber),
+        Kunstwerk: lot.title,
+        Kunstenaar: lot.artist,
+        Status: lot.status === 'sold' ? 'Verkocht / Toegewezen' : 'Huidig hoogste bod',
+        'Koper / Biednummer': lot.highestBidderNumber || '—',
+        'Naam koper': profile?.name || '—',
+        'Bedrijf / Organisatie': profile?.companyName || '—',
+        'BTW-nummer': profile?.vatNumber || 'Nog aan te vullen',
+        'E-mailadres': profile?.email || '—',
+        'Bedrag (EUR)': lot.currentBid,
+        'Aantal biedingen': lot.bidCount,
+      };
+    });
+
     const wb = XLSX.utils.book_new();
+    const wsBuyers = XLSX.utils.json_to_sheet(
+      buyerRows.length > 0
+        ? buyerRows
+        : [{ Melding: 'Nog geen biedingen of kopers geregistreerd.' }]
+    );
     const wsArtworks = XLSX.utils.json_to_sheet(artworkRows);
     const wsBids = XLSX.utils.json_to_sheet(
       bidRows.length > 0
@@ -311,11 +439,12 @@ export function AdminPanel() {
         : [{ Melding: 'Nog geen bieders ingeschreven.' }]
     );
 
+    XLSX.utils.book_append_sheet(wb, wsBuyers, 'Kopersoverzicht');
+    XLSX.utils.book_append_sheet(wb, wsBilling, 'Inschrijvingen & BTW');
     XLSX.utils.book_append_sheet(wb, wsArtworks, 'Kunstwerken');
     XLSX.utils.book_append_sheet(wb, wsBids, 'Biedgeschiedenis');
-    XLSX.utils.book_append_sheet(wb, wsBilling, 'Facturatiegegevens');
     XLSX.writeFile(wb, 'Art_for_Climate_Leuven2030_Veiling.xlsx');
-    setMessage('Excel-bestand (Art_for_Climate_Leuven2030_Veiling.xlsx) inclusief btw- en facturatiegegevens gedownload.');
+    setMessage('Excel-bestand (Art_for_Climate_Leuven2030_Veiling.xlsx) met kopersoverzicht, inschrijvingen en btw-gegevens gedownload.');
   };
 
   const handleSaveOrganizerSettings = async (e: React.FormEvent) => {
@@ -395,8 +524,9 @@ export function AdminPanel() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-6 border-t border-[#E5E5E5] overflow-x-auto">
           {(
             [
+              { id: 'overview', label: `Inschrijvingen & Kopers (${allKnownBidderNumbers.length})` },
               { id: 'inventory', label: `Kunstwerken (${artworks.length})` },
-              { id: 'billing', label: `Facturatie & BTW (${allKnownBidderNumbers.length})` },
+              { id: 'billing', label: `Facturatie & BTW` },
               { id: 'import', label: 'Catalogus PDF & Grondplan' },
               { id: 'qrcodes', label: `QR-bordjes (${artworks.length})` },
               { id: 'ledger', label: `Biedgeschiedenis (${bids.length})` },
@@ -407,7 +537,7 @@ export function AdminPanel() {
               type="button"
               onClick={() => {
                 setActiveTab(tab.id);
-                if (tab.id === 'billing') void fetchBillingData();
+                if (tab.id === 'billing' || tab.id === 'overview') void fetchBillingData();
               }}
               className={`min-h-[48px] py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === tab.id
@@ -433,6 +563,456 @@ export function AdminPanel() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* TAB 0: GROOT OVERZICHT INSCHRIJVINGEN & KOPERS VAN DE KUNSTWERKEN */}
+        {activeTab === 'overview' && (
+          <div className="space-y-10">
+            {/* 4 Overzichtsblokken (enkel voor beheerders) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="border border-[#E5E5E5] bg-white rounded-2xl p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#5D6C7B]">
+                  Inschrijvingen
+                </p>
+                <p className="font-mono text-3xl font-bold text-[#19706D] tabular-nums mt-1">
+                  {allKnownBidderNumbers.length}
+                </p>
+                <p className="text-xs text-[#5D6C7B] mt-1">Gekoppelde biednummers</p>
+              </div>
+              <div className="border border-[#E5E5E5] bg-white rounded-2xl p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#5D6C7B]">
+                  Leidende bieders / kopers
+                </p>
+                <p className="font-mono text-3xl font-bold text-[#1E5941] tabular-nums mt-1">
+                  {leadingBiddersCount}
+                </p>
+                <p className="text-xs text-[#5D6C7B] mt-1">Met minstens 1 hoogste bod</p>
+              </div>
+              <div className="border border-[#E5E5E5] bg-white rounded-2xl p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#5D6C7B]">
+                  Werken met hoogste bod
+                </p>
+                <p className="font-mono text-3xl font-bold text-[#363E49] tabular-nums mt-1">
+                  {lotsWithBids.length} <span className="text-base font-normal text-[#5D6C7B]">/ {artworks.length}</span>
+                </p>
+                <p className="text-xs text-[#5D6C7B] mt-1">
+                  {lotsWithBids.filter((l) => l.status === 'sold').length} definitief verkocht
+                </p>
+              </div>
+              <div className="border border-[#B4C232]/60 bg-[#F0F3E1] rounded-2xl p-5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#1E5941]">
+                  Interne veilingopbrengst
+                </p>
+                <p className="font-mono text-3xl font-bold text-[#1E5941] tabular-nums mt-1">
+                  {formatEuro(totalRealizedAmount)}
+                </p>
+                <p className="text-xs text-[#1E5941]/80 mt-1">Enkel zichtbaar in Beheer</p>
+              </div>
+            </div>
+
+            {/* Zoekbalk & Snelfilters */}
+            <div className="border border-[#E5E5E5] bg-white rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-xl">
+                <Search
+                  className="w-4 h-4 text-[#5D6C7B] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={overviewSearch}
+                  onChange={(e) => setOverviewSearch(e.target.value)}
+                  placeholder="Zoek op biednummer (#001), naam, bedrijf, btw-nummer of titel schilderij..."
+                  className="w-full min-h-[44px] pl-10 pr-4 py-2 rounded-[12px] border border-[#E5E5E5] text-sm text-[#363E49] focus:outline-none focus:border-[#19706D]"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { id: 'all', label: `Alle inschrijvingen (${allKnownBidderNumbers.length})` },
+                    { id: 'with_bids', label: 'Met uitgebrachte biedingen' },
+                    { id: 'leading', label: `Met hoogste bod (${leadingBiddersCount})` },
+                  ] as const
+                ).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setOverviewFilter(f.id)}
+                    className={`min-h-[38px] px-3.5 py-1.5 rounded-[10px] text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
+                      overviewFilter === f.id
+                        ? 'bg-[#19706D] text-white'
+                        : 'bg-[#F7F7F7] text-[#363E49] hover:bg-[#DEE9EC]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* OVERZICHT 1: ALLE INSCHRIJVINGEN GEKOPPELD AAN BIEDNUMMER + BIEDINGEN + HOOGSTE BOD */}
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E5E5E5] pb-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#19706D] inline-flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Overzicht 1 · Inschrijvingen &amp; Biedingen</span>
+                  </p>
+                  <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#363E49] mt-0.5">
+                    Inschrijvingen gekoppeld aan biednummer en biedingen
+                  </h2>
+                </div>
+                <span className="font-mono text-xs font-semibold text-[#5D6C7B] tabular-nums">
+                  {filteredBidderNumbers.length} weergegeven
+                </span>
+              </div>
+
+              {filteredBidderNumbers.length === 0 ? (
+                <div className="border border-[#E5E5E5] bg-white rounded-2xl p-8 text-center text-sm text-[#5D6C7B]">
+                  Geen inschrijvingen gevonden die overeenkomen met je zoekfilter.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredBidderNumbers.map((num, idx) => {
+                    const profile: BidderBillingProfile = billingByBidderNumber.get(num) ?? {
+                      bidderNumber: num,
+                      name: `Zaalbieder ${num}`,
+                      companyName: '',
+                      vatNumber: '',
+                      email: '',
+                      street: '',
+                      postalCode: '3000',
+                      city: 'Leuven',
+                      country: 'België',
+                      registeredAt: new Date().toISOString(),
+                    };
+                    const bidderBids = bidsByBidder.get(num) ?? [];
+                    const leadingLots = wonLotsByBidder.get(num) ?? [];
+                    const leadingTotal = leadingLots.reduce((sum, l) => sum + l.currentBid, 0);
+                    const hasSoldLot = leadingLots.some((l) => l.status === 'sold');
+
+                    return (
+                      <div
+                        key={num}
+                        className={`border rounded-2xl bg-white overflow-hidden ${
+                          leadingLots.length > 0
+                            ? 'border-[#1E5941]/50 shadow-xs'
+                            : 'border-[#E5E5E5]'
+                        }`}
+                      >
+                        {/* Bieder kopbalk: Biednummer + Inschrijfgegevens + Hoogste bod status */}
+                        <div className="p-5 sm:p-6 bg-[#F7F7F7]/70 border-b border-[#E5E5E5] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                          <div className="flex flex-wrap items-start sm:items-center gap-4">
+                            <div className="px-4 py-2.5 rounded-xl bg-[#19706D] text-white font-mono text-xl font-bold tabular-nums shrink-0">
+                              {num}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-display text-lg font-bold text-[#363E49]">
+                                  {profile.name}
+                                </h3>
+                                {profile.companyName && (
+                                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-[#DEE9EC] text-[#19706D]">
+                                    {profile.companyName}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-[#5D6C7B] mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className="font-mono font-semibold text-[#363E49]">
+                                  BTW: {profile.vatNumber || 'Ontbreekt'}
+                                </span>
+                                <span>·</span>
+                                <span>{profile.email || 'Geen e-mail'}</span>
+                                {profile.street && (
+                                  <>
+                                    <span>·</span>
+                                    <span>
+                                      {profile.street}, {profile.postalCode} {profile.city}
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                            {leadingLots.length > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F3E1] border border-[#B4C232] text-[#1E5941] text-xs font-bold">
+                                <Award className="w-4 h-4" aria-hidden="true" />
+                                <span>
+                                  {hasSoldLot ? 'Koper / Hoogste bod' : 'Hoogste bod'} op {leadingLots.length}{' '}
+                                  {leadingLots.length === 1 ? 'werk' : 'werken'} ({formatEuro(leadingTotal)})
+                                </span>
+                              </span>
+                            ) : bidderBids.length > 0 ? (
+                              <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-white border border-[#E5E5E5] text-[#5D6C7B] text-xs font-semibold">
+                                Overboden · {bidderBids.length}{' '}
+                                {bidderBids.length === 1 ? 'bod' : 'biedingen'}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-3 py-1.5 rounded-xl bg-white border border-[#E5E5E5] text-[#5D6C7B] text-xs font-medium">
+                                Ingeschreven · nog geen bod
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setEditingBilling(profile)}
+                              className="min-h-[36px] px-3 py-1.5 rounded-[10px] border border-[#E5E5E5] bg-white text-xs font-semibold text-[#363E49] hover:border-[#19706D] cursor-pointer"
+                            >
+                              Bewerk
+                            </button>
+                            {leadingLots.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setInvoiceTarget({
+                                    bidder: profile,
+                                    lots: leadingLots,
+                                    index: idx + 1,
+                                  })
+                                }
+                                className="min-h-[36px] px-3 py-1.5 rounded-[10px] bg-[#1E5941] hover:bg-[#19706D] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+                                <span>Factuur</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Lijst van alle biedingen die deze inschrijving heeft uitgebracht */}
+                        <div className="p-4 sm:p-5">
+                          {bidderBids.length === 0 && leadingLots.length === 0 ? (
+                            <p className="text-xs text-[#5D6C7B] italic">
+                              Deze inschrijving heeft nog geen bod uitgebracht op een kunstwerk.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-[11px] font-bold uppercase tracking-wider text-[#5D6C7B]">
+                                Uitgebrachte biedingen door {num} ({bidderBids.length})
+                              </p>
+                              <div className="divide-y divide-[#E5E5E5] border border-[#E5E5E5] rounded-xl overflow-hidden">
+                                {bidderBids.map((bid) => {
+                                  const lot = artworkById.get(bid.artworkId);
+                                  const isCurrentHighest =
+                                    Boolean(lot) &&
+                                    lot?.highestBidderNumber === num &&
+                                    lot?.currentBid === bid.amount;
+                                  const isSoldWinner = isCurrentHighest && lot?.status === 'sold';
+
+                                  return (
+                                    <div
+                                      key={bid.id}
+                                      className={`px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm ${
+                                        isCurrentHighest ? 'bg-[#F0F3E1]/65' : 'bg-white'
+                                      }`}
+                                    >
+                                      <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                                        <span className="font-mono text-xs font-bold text-[#19706D] tabular-nums shrink-0">
+                                          {formatLotNumber(bid.lotNumber)}
+                                        </span>
+                                        <span className="font-bold text-[#363E49] truncate">
+                                          {bid.artworkTitle}
+                                        </span>
+                                        {lot && (
+                                          <span className="text-xs text-[#5D6C7B] truncate">
+                                            ({lot.artist})
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-3 shrink-0">
+                                        <span className="font-mono text-xs text-[#5D6C7B] tabular-nums">
+                                          {formatTimeShort(bid.createdAt)} ·{' '}
+                                          {bid.source === 'floor' ? 'Zaal' : 'QR-sokkel'}
+                                        </span>
+                                        <span className="font-mono text-sm font-bold text-[#363E49] tabular-nums">
+                                          {formatEuro(bid.amount)}
+                                        </span>
+                                        {isSoldWinner ? (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1E5941] text-white text-[11px] font-bold">
+                                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                            <span>KOPER / GEWONNEN</span>
+                                          </span>
+                                        ) : isCurrentHighest ? (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#19706D] text-white text-[11px] font-bold">
+                                            <Award className="w-3.5 h-3.5" aria-hidden="true" />
+                                            <span>HOOGSTE BOD</span>
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#F7F7F7] text-[#5D6C7B] text-[11px] font-semibold">
+                                            Overboden{lot && lot.currentBid > 0 ? ` (nu ${formatEuro(lot.currentBid)})` : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* OVERZICHT 2: KOPERS VAN DE SCHILDERIJEN / KUNSTWERKEN */}
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E5E5E5] pb-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#1E5941] inline-flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Overzicht 2 · Kopers van de kunstwerken</span>
+                  </p>
+                  <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#363E49] mt-0.5">
+                    Overzicht kopers &amp; hoogste bieders per schilderij/werk
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="min-h-[40px] px-4 py-2 rounded-[10px] bg-[#1E5941] text-white hover:bg-[#19706D] text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Download Kopersoverzicht (.xlsx)</span>
+                </button>
+              </div>
+
+              {filteredLotsWithBids.length === 0 ? (
+                <div className="border border-[#E5E5E5] bg-white rounded-2xl p-8 text-center text-sm text-[#5D6C7B]">
+                  Zodra een bieder een bod uitbrengt op een kunstwerk verschijnt hier het volledige kopersoverzicht met biednummer, btw-nummer en factuurknop.
+                </div>
+              ) : (
+                <div className="border border-[#E5E5E5] rounded-2xl bg-white overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-[#E5E5E5] bg-[#F7F7F7] text-xs uppercase tracking-wider text-[#5D6C7B]">
+                        <th className="py-3.5 px-4 font-bold">Lot &amp; Kunstwerk</th>
+                        <th className="py-3.5 px-4 font-bold">Status</th>
+                        <th className="py-3.5 px-4 font-bold">Koper (Biednr.)</th>
+                        <th className="py-3.5 px-4 font-bold">Naam, Bedrijf &amp; BTW-nummer</th>
+                        <th className="py-3.5 px-4 font-bold">Hoogste bod</th>
+                        <th className="py-3.5 px-4 font-bold text-right">Facturatie</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5E5E5]">
+                      {filteredLotsWithBids.map((lot, idx) => {
+                        const buyerNum = lot.highestBidderNumber || '#000';
+                        const profile: BidderBillingProfile = billingByBidderNumber.get(buyerNum) ?? {
+                          bidderNumber: buyerNum,
+                          name: `Zaalbieder ${buyerNum}`,
+                          companyName: '',
+                          vatNumber: '',
+                          email: '',
+                          street: '',
+                          postalCode: '3000',
+                          city: 'Leuven',
+                          country: 'België',
+                          registeredAt: new Date().toISOString(),
+                        };
+                        const isSold = lot.status === 'sold';
+
+                        return (
+                          <tr key={lot.id} className={isSold ? 'bg-[#F0F3E1]/40' : 'hover:bg-[#F7F7F7]'}>
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <ArtworkImageFrame
+                                  src={lot.imageUrl}
+                                  alt={lot.title}
+                                  className="w-14 h-14 shrink-0 rounded-lg border border-[#E5E5E5]"
+                                />
+                                <div className="min-w-0">
+                                  <p className="font-mono text-xs font-bold text-[#19706D] tabular-nums">
+                                    {formatLotNumber(lot.lotNumber)}
+                                  </p>
+                                  <p className="font-bold text-[#363E49] truncate max-w-[230px]">
+                                    {lot.title}
+                                  </p>
+                                  <p className="text-xs text-[#5D6C7B] truncate max-w-[230px]">
+                                    {lot.artist}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              {isSold ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1E5941] text-white text-xs font-bold">
+                                  <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>Verkocht</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#DEE9EC] text-[#19706D] text-xs font-bold">
+                                  <Award className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>Hoogste bod</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-[#19706D] text-white font-mono text-sm font-bold tabular-nums">
+                                {buyerNum}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <p className="font-bold text-[#363E49]">
+                                {profile.companyName ? `${profile.companyName} — ${profile.name}` : profile.name}
+                              </p>
+                              <p className="text-xs text-[#5D6C7B] mt-0.5">
+                                <span className="font-mono font-semibold text-[#363E49]">
+                                  {profile.vatNumber || 'BTW ontbreekt'}
+                                </span>
+                                {profile.email ? ` · ${profile.email}` : ''}
+                              </p>
+                              {profile.street && (
+                                <p className="text-[11px] text-[#5D6C7B]">
+                                  {profile.street}, {profile.postalCode} {profile.city}
+                                </p>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <p className="font-mono text-base font-bold text-[#1E5941] tabular-nums">
+                                {formatEuro(lot.currentBid)}
+                              </p>
+                              <p className="text-[11px] text-[#5D6C7B] tabular-nums">
+                                {lot.bidCount} {lot.bidCount === 1 ? 'bod' : 'biedingen'}
+                              </p>
+                            </td>
+                            <td className="py-4 px-4 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingBilling(profile)}
+                                  className="min-h-[36px] px-3 py-1.5 rounded-[8px] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] hover:border-[#19706D] cursor-pointer"
+                                >
+                                  Gegevens
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setInvoiceTarget({
+                                      bidder: profile,
+                                      lots: wonLotsByBidder.get(buyerNum) ?? [lot],
+                                      index: idx + 1,
+                                    })
+                                  }
+                                  className="min-h-[36px] px-3 py-1.5 rounded-[8px] bg-[#19706D] hover:bg-[#1E5941] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>Factuur</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </div>
         )}
 
@@ -762,10 +1342,10 @@ export function AdminPanel() {
                   Officiële catalogus inlezen
                 </p>
                 <h2 className="font-display text-2xl font-bold text-[#363E49] mt-1">
-                  LEUVEN2030_catalogus_ArtForClimate.pdf
+                  LEUVEN2030_catalogus_kunstveiling_v12.pdf
                 </h2>
                 <p className="text-sm text-[#5D6C7B] mt-2 leading-relaxed">
-                  De officiële 56 pagina&apos;s tellende catalogus van Leuven 2030 is reeds ingeladen met alle 44 loten en afbeeldingen. Via onderstaande upload kan je steeds een bijgewerkte PDF inlezen.
+                  De bijgewerkte officiële catalogus v12 van Leuven 2030 is reeds ingeladen met alle 45 loten (Lot 10 t/m 54) en afbeeldingen. Via onderstaande upload kan je steeds een nieuwere PDF inlezen.
                 </p>
               </div>
 
@@ -787,7 +1367,7 @@ export function AdminPanel() {
                     : 'Kies bijgewerkte catalogus (PDF)'}
                 </span>
                 <span className="block text-xs text-[#5D6C7B] mt-1">
-                  Actieve bron: {auctionState?.catalogPdfName ?? 'LEUVEN2030_catalogus_ArtForClimate.pdf'}
+                  Actieve bron: {auctionState?.catalogPdfName ?? 'LEUVEN2030_catalogus_kunstveiling_v12.pdf'}
                 </span>
                 <input
                   type="file"
@@ -814,7 +1394,7 @@ export function AdminPanel() {
                   Grondplan opladen
                 </h2>
                 <p className="text-sm text-[#5D6C7B] mt-2 leading-relaxed">
-                  Laad het grondplan van M Leuven (PNG, JPG of SVG) op. Bezoekers zien dit samen met het interactieve L-vormige schema (Antichambre Deel 1, Antichambre Deel 2 en Forum).
+                  Laad het grondplan van M Leuven (PNG, JPG of WEBP) op. Bezoekers zien dit samen met het interactieve L-vormige schema (Antichambre Deel 1, Antichambre Deel 2 en Forum).
                 </p>
               </div>
 
@@ -871,6 +1451,54 @@ export function AdminPanel() {
                 <span>Druk alle bordjes af</span>
               </button>
             </div>
+
+            {/* Eigen domeinnaam voor QR-codes */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setSubmitting(true);
+                setMessage(null);
+                try {
+                  await updateAuctionState({ publicBaseUrl: publicDomainInput.trim() || null });
+                  setMessage(
+                    publicDomainInput.trim()
+                      ? `Eigen domein (${publicDomainInput.trim()}) opgeslagen. Alle QR-codes gebruiken nu dit adres.`
+                      : 'Eigen domein gewist. QR-codes gebruiken het huidige webadres.'
+                  );
+                } catch (err) {
+                  setMessage(err instanceof Error ? err.message : 'Domeinnaam opslaan mislukt.');
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="border border-[#E5E5E5] rounded-2xl bg-white p-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4 no-print"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#19706D]">
+                  <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Eigen domeinnaam voor QR-codes (zonder .vercel.app)</span>
+                </div>
+                <p className="text-xs text-[#5D6C7B] mt-1">
+                  Vul hier het eigen domein van Leuven 2030 in (bv. <span className="font-mono text-[#363E49]">https://artforclimate.leuven2030.be</span>) nadat je dit in Vercel hebt gekoppeld via <strong>Project Settings → Domains</strong>.
+                </p>
+                <input
+                  type="text"
+                  value={publicDomainInput}
+                  onChange={(e) => setPublicDomainInput(e.target.value)}
+                  placeholder="https://artforclimate.leuven2030.be"
+                  className="mt-3 w-full min-h-[42px] px-3.5 py-2 rounded-[10px] border border-[#E5E5E5] text-sm font-mono text-[#363E49] focus:outline-none focus:border-[#19706D]"
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="min-h-[42px] px-5 py-2 rounded-[10px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                >
+                  Domein opslaan
+                </button>
+              </div>
+            </form>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {artworks.map((lot) => (

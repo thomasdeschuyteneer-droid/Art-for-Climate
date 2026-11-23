@@ -34,7 +34,7 @@ function resolveWritableDataDir(): string {
 const DATA_DIR = resolveWritableDataDir();
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'auction-db.json');
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -147,6 +147,7 @@ interface AuctionState {
   announcement: string;
   catalogPdfName: string | null;
   floorplanImageUrl: string | null;
+  publicBaseUrl?: string | null;
   updatedAt: string;
 }
 
@@ -240,8 +241,10 @@ function createInitialSeed(): AuctionDB {
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
       'Welkom in M Leuven. Bieden gebeurt uitsluitend ter plekke met jouw persoonlijk biedernummer ten voordele van het Leuvens Klimaatfonds.',
-    catalogPdfName: 'LEUVEN2030_catalogus_ArtForClimate.pdf',
+    catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
+    publicBaseUrl:
+      (process.env.PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL || '').trim().replace(/\/+$/, '') || null,
     updatedAt: nowIso,
   };
 
@@ -282,6 +285,15 @@ function loadDB(): AuctionDB {
       const seeded = createInitialSeed();
       if (parsed.adminCredential) {
         seeded.adminCredential = parsed.adminCredential;
+      }
+      if (parsed.organizerSettings) {
+        seeded.organizerSettings = parsed.organizerSettings;
+      }
+      if (parsed.auctionState?.publicBaseUrl) {
+        seeded.auctionState.publicBaseUrl = parsed.auctionState.publicBaseUrl;
+      }
+      if (parsed.auctionState?.floorplanImageUrl) {
+        seeded.auctionState.floorplanImageUrl = parsed.auctionState.floorplanImageUrl;
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(seeded, null, 2), 'utf-8');
       return seeded;
@@ -1345,6 +1357,7 @@ async function startServer(): Promise<void> {
       isLiveSessionActive,
       auctionClosed,
       announcement,
+      publicBaseUrl,
       timerAction,
       durationSeconds,
     } = req.body ?? {};
@@ -1418,6 +1431,33 @@ async function startServer(): Promise<void> {
 
     if (typeof announcement === 'string') {
       db.auctionState.announcement = announcement.trim().slice(0, 240);
+    }
+
+    if (publicBaseUrl === null || publicBaseUrl === '') {
+      db.auctionState.publicBaseUrl = null;
+    } else if (typeof publicBaseUrl === 'string') {
+      const trimmedUrl = publicBaseUrl.trim().replace(/\/+$/, '');
+      if (trimmedUrl.length > 200) {
+        res.status(400).json({ error: 'Domein-URL is te lang.' });
+        return;
+      }
+      try {
+        const candidate = /^https?:\/\//i.test(trimmedUrl) ? trimmedUrl : `https://${trimmedUrl}`;
+        const parsed = new URL(candidate);
+        if (
+          (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') ||
+          (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost') ||
+          parsed.username ||
+          parsed.password
+        ) {
+          res.status(400).json({ error: 'Ongeldige domeinnaam. Voorbeeld: https://artforclimate.leuven2030.be' });
+          return;
+        }
+        db.auctionState.publicBaseUrl = parsed.origin;
+      } catch {
+        res.status(400).json({ error: 'Ongeldige domeinnaam. Voorbeeld: https://artforclimate.leuven2030.be' });
+        return;
+      }
     }
 
     db.auctionState.updatedAt = nowIso;

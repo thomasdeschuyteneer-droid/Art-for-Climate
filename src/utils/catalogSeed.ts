@@ -88,8 +88,11 @@ export function buildInitialSeedSnapshot(): AuctionSnapshot {
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
       'Welkom in M Leuven. Bieden gebeurt uitsluitend ter plekke met jouw persoonlijk biedernummer ten voordele van het Leuvens Klimaatfonds.',
-    catalogPdfName: 'LEUVEN2030_catalogus_ArtForClimate.pdf',
+    catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
+    publicBaseUrl:
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')) ||
+      null,
     updatedAt: nowIso,
   };
 

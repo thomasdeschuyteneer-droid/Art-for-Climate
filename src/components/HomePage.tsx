@@ -15,7 +15,7 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
 
   const highlightedLots = useMemo(() => {
     // Zet bekende werken uit de catalogus en actief lot bovenaan in de selectie
-    const preferredOrder = [33, 35, 14, 45, 22, 15];
+    const preferredOrder = [10, 34, 36, 16, 46, 23];
     const picked: typeof artworks = [];
     for (const num of preferredOrder) {
       const found = artworks.find((a) => a.lotNumber === num);

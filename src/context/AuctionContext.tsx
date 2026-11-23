@@ -80,7 +80,7 @@ interface AuctionContextValue {
 const AuctionContext = createContext<AuctionContextValue | null>(null);
 const BIDDER_STORAGE_KEY = 'art_for_climate_bidder_number';
 const ONSITE_STORAGE_KEY = 'art_for_climate_mleuven_onsite';
-const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v5';
+const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v12';
 const LOCAL_BILLING_KEY = 'art_for_climate_static_billing_v5';
 const LOCAL_SETTINGS_KEY = 'art_for_climate_static_settings_v5';
 const LOCAL_ADMIN_HASH_KEY = 'art_for_climate_static_admin_v5';

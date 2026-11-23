@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Check, Copy, Download } from 'lucide-react';
 import type { Artwork } from '../types/auction';
+import { useAuction } from '../context/AuctionContext';
 import { formatLotNumber } from '../utils/format';
 
 interface QrCodeCardProps {
@@ -9,14 +10,56 @@ interface QrCodeCardProps {
   compact?: boolean;
 }
 
+function isPreviewHostname(hostname: string): boolean {
+  return (
+    hostname.endsWith('.vercel.app') ||
+    hostname.endsWith('.run.app') ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1'
+  );
+}
+
 export function QrCodeCard({ artwork, compact = false }: QrCodeCardProps) {
+  const { auctionState } = useAuction();
   const [dataUrl, setDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
-  const lotUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/artwork/${artwork.id}?zaal=mleuven`
-      : `/artwork/${artwork.id}?zaal=mleuven`;
+  const rawConfigured =
+    auctionState?.publicBaseUrl?.trim().replace(/\/+$/, '') ||
+    (typeof import.meta !== 'undefined' &&
+      import.meta.env?.VITE_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')) ||
+    '';
+
+  let configuredOrigin = '';
+  if (rawConfigured) {
+    try {
+      const parsedCfg = new URL(
+        rawConfigured.startsWith('http://') || rawConfigured.startsWith('https://')
+          ? rawConfigured
+          : `https://${rawConfigured}`
+      );
+      configuredOrigin = parsedCfg.origin;
+    } catch {
+      configuredOrigin = '';
+    }
+  }
+
+  const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const effectiveOrigin = configuredOrigin || fallbackOrigin;
+  const lotPath = `/artwork/${artwork.id}?zaal=mleuven`;
+  const lotUrl = effectiveOrigin ? `${effectiveOrigin}${lotPath}` : lotPath;
+
+  let displayHost = '';
+  try {
+    if (effectiveOrigin) {
+      const parsed = new URL(effectiveOrigin);
+      if (configuredOrigin || !isPreviewHostname(parsed.hostname)) {
+        displayHost = `${parsed.host}/artwork/${artwork.id}`;
+      }
+    }
+  } catch {
+    displayHost = '';
+  }
 
   useEffect(() => {
     let active = true;
@@ -95,7 +138,7 @@ export function QrCodeCard({ artwork, compact = false }: QrCodeCardProps) {
             Scan ter plekke in M Leuven om te bieden op dit kunstwerk
           </p>
           <p className="font-mono text-[11px] text-[#5D6C7B] truncate mt-1" title={lotUrl}>
-            {lotUrl}
+            {displayHost || `Art for Climate · ${formatLotNumber(artwork.lotNumber)} · M Leuven`}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2 no-print">

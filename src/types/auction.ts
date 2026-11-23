@@ -94,6 +94,7 @@ export interface AuctionState {
   announcement: string;
   catalogPdfName: string | null;
   floorplanImageUrl: string | null;
+  publicBaseUrl?: string | null;
   updatedAt: string;
 }
 

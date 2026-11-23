@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Lock } from 'lucide-react';
 import { AuctionProvider, useAuction } from './context/AuctionContext';
 import { HeaderNav, type AppRoute } from './components/HeaderNav';
 import { MobileTabBar } from './components/MobileTabBar';
@@ -10,7 +11,7 @@ import { LiveRoom } from './components/LiveRoom';
 import { FloorplanView } from './components/FloorplanView';
 import { AuctioneerDashboard } from './components/AuctioneerDashboard';
 import { AdminPanel } from './components/AdminPanel';
-import { AdminAuthGate } from './components/AdminAuthGate';
+import { AdminAuthGate, AdminLoginModal } from './components/AdminAuthGate';
 
 function parseRouteFromLocation(): AppRoute {
   if (typeof window === 'undefined') return { view: 'home' };
@@ -55,6 +56,7 @@ function AuctionShell() {
   const { currentBidderNumber, isAdmin, logoutAdmin } = useAuction();
   const [route, setRoute] = useState<AppRoute>(() => parseRouteFromLocation());
   const [bidderModalOpen, setBidderModalOpen] = useState(false);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
 
   useEffect(() => {
     const onPopState = () => {
@@ -200,14 +202,22 @@ function AuctionShell() {
                 >
                   Beheer
                 </button>
+                <button
+                  type="button"
+                  onClick={handleLogoutAdmin}
+                  className="text-[#5D6C7B] hover:text-[#923636] cursor-pointer"
+                >
+                  Afmelden
+                </button>
               </>
             ) : (
               <button
                 type="button"
-                onClick={() => navigate({ view: 'admin' })}
-                className="text-[#5D6C7B]/75 hover:text-[#19706D] font-normal cursor-pointer"
+                onClick={() => setAdminLoginOpen(true)}
+                className="inline-flex items-center gap-1.5 text-[#5D6C7B] hover:text-[#19706D] font-semibold cursor-pointer"
               >
-                Organisatie
+                <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Beheerder inloggen</span>
               </button>
             )}
           </div>
@@ -218,6 +228,11 @@ function AuctionShell() {
       <BidderModal
         open={bidderModalOpen}
         onClose={() => setBidderModalOpen(false)}
+      />
+      <AdminLoginModal
+        open={adminLoginOpen}
+        onClose={() => setAdminLoginOpen(false)}
+        onAuthenticated={() => navigate({ view: 'admin' })}
       />
     </div>
   );
