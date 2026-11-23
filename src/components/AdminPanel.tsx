@@ -823,7 +823,7 @@ export function AdminPanel() {
                 <span className="block text-sm font-bold text-[#363E49]">
                   {uploadingFloorplan
                     ? 'Grondplan wordt opgeslagen...'
-                    : 'Kies grondplanafbeelding (PNG, JPG, SVG)'}
+                    : 'Kies grondplanafbeelding (PNG, JPG, WEBP)'}
                 </span>
                 <span className="block text-xs text-[#5D6C7B] mt-1">
                   {auctionState?.floorplanImageUrl
@@ -832,7 +832,7 @@ export function AdminPanel() {
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp"
                   disabled={uploadingFloorplan}
                   onChange={(e) => void handleFloorplanUpload(e)}
                   className="sr-only"
@@ -1095,7 +1095,7 @@ export function AdminPanel() {
                     Kies afbeelding
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp"
                       onChange={(e) => void handleArtworkImageFile(e)}
                       className="sr-only"
                     />

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "artworks": [
     {
       "id": "lot-10",
@@ -25,8 +25,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-11",
@@ -52,8 +52,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-12",
@@ -79,8 +79,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-13",
@@ -106,8 +106,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-14",
@@ -133,8 +133,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-15",
@@ -160,8 +160,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-16",
@@ -187,8 +187,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-17",
@@ -214,8 +214,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-18",
@@ -241,8 +241,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-19",
@@ -268,8 +268,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-20",
@@ -295,8 +295,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-21",
@@ -322,8 +322,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-22",
@@ -349,8 +349,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-23",
@@ -376,8 +376,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-24",
@@ -403,8 +403,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-25",
@@ -430,8 +430,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-26",
@@ -457,8 +457,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-27",
@@ -484,8 +484,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-28",
@@ -511,8 +511,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-29",
@@ -538,8 +538,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-30",
@@ -565,8 +565,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-31",
@@ -592,8 +592,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-32",
@@ -619,8 +619,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-33",
@@ -646,8 +646,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-34",
@@ -673,8 +673,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-35",
@@ -700,8 +700,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-36",
@@ -727,8 +727,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-37",
@@ -754,8 +754,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-38",
@@ -781,8 +781,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-39",
@@ -808,8 +808,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-40",
@@ -835,8 +835,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-41",
@@ -862,8 +862,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-42",
@@ -889,8 +889,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-43",
@@ -916,8 +916,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-44",
@@ -943,8 +943,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-45",
@@ -970,8 +970,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-46",
@@ -997,8 +997,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-47",
@@ -1024,8 +1024,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-48",
@@ -1051,8 +1051,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-49",
@@ -1078,8 +1078,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-50",
@@ -1105,8 +1105,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-51",
@@ -1132,8 +1132,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-52",
@@ -1159,8 +1159,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     },
     {
       "id": "lot-53",
@@ -1186,8 +1186,8 @@
       "highestBidderNumber": null,
       "bidCount": 0,
       "status": "live",
-      "createdAt": "2026-11-23T08:19:55.819Z",
-      "updatedAt": "2026-11-23T08:19:55.819Z"
+      "createdAt": "2026-11-23T08:37:30.266Z",
+      "updatedAt": "2026-11-23T08:37:30.266Z"
     }
   ],
   "bids": [],
@@ -1221,6 +1221,7 @@
     "announcement": "Welkom in M Leuven. Bieden gebeurt uitsluitend ter plekke met jouw persoonlijk biedernummer ten voordele van het Leuvens Klimaatfonds.",
     "catalogPdfName": "LEUVEN2030_catalogus_ArtForClimate.pdf",
     "floorplanImageUrl": null,
-    "updatedAt": "2026-11-23T08:19:55.819Z"
-  }
+    "updatedAt": "2026-11-23T08:37:30.266Z"
+  },
+  "adminCredential": null
 }

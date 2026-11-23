@@ -1,13 +1,14 @@
-import { Gavel, Home, LayoutGrid, Map, Radio } from 'lucide-react';
+import { Gavel, Home, LayoutGrid, Map, Radio, Shield } from 'lucide-react';
 import type { AppRoute } from './HeaderNav';
 
 interface MobileTabBarProps {
   route: AppRoute;
   onNavigate: (next: AppRoute) => void;
+  isAdmin: boolean;
 }
 
-export function MobileTabBar({ route, onNavigate }: MobileTabBarProps) {
-  const tabs: Array<{
+export function MobileTabBar({ route, onNavigate, isAdmin }: MobileTabBarProps) {
+  const publicTabs: Array<{
     label: string;
     view: AppRoute['view'];
     target: AppRoute;
@@ -17,15 +18,22 @@ export function MobileTabBar({ route, onNavigate }: MobileTabBarProps) {
     { label: 'Werken', view: 'gallery', target: { view: 'gallery' }, Icon: LayoutGrid },
     { label: 'Live', view: 'live', target: { view: 'live' }, Icon: Radio },
     { label: 'M Leuven', view: 'floorplan', target: { view: 'floorplan' }, Icon: Map },
-    { label: 'Regie', view: 'auctioneer', target: { view: 'auctioneer' }, Icon: Gavel },
   ];
+
+  const tabs = isAdmin
+    ? [
+        ...publicTabs.slice(0, 3),
+        { label: 'Regie', view: 'auctioneer' as const, target: { view: 'auctioneer' as const }, Icon: Gavel },
+        { label: 'Beheer', view: 'admin' as const, target: { view: 'admin' as const }, Icon: Shield },
+      ]
+    : publicTabs;
 
   return (
     <nav
       aria-label="Mobiele navigatie"
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E5E5E5] no-print"
     >
-      <div className="grid grid-cols-5 items-center h-14">
+      <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} items-center h-14`}>
         {tabs.map(({ label, view, target, Icon }) => {
           const isActive =
             route.view === view || (view === 'gallery' && route.view === 'artwork');

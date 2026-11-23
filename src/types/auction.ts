@@ -103,3 +103,11 @@ export interface AuctionSnapshot {
   bidders: BidderSummary[];
   auctionState: AuctionState;
 }
+
+export interface AdminAuthStatus {
+  configured: boolean;
+  hasEnvCredentials: boolean;
+  authenticated: boolean;
+  username: string | null;
+}
+

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  AdminAuthStatus,
   Artwork,
   AuctionSnapshot,
   AuctionState,
@@ -34,6 +35,8 @@ interface AuctionContextValue {
   auctionState: AuctionState | null;
   billingProfiles: BidderBillingProfile[];
   organizerSettings: InvoiceOrganizerSettings;
+  authStatus: AdminAuthStatus;
+  isAdmin: boolean;
   currentBidderNumber: string | null;
   onSiteVerified: boolean;
   setOnSiteVerified: (verified: boolean) => void;
@@ -41,6 +44,9 @@ interface AuctionContextValue {
   connected: boolean;
   error: string | null;
   setCurrentBidderNumber: (bidderNumber: string | null) => void;
+  setupAdmin: (username: string, password: string) => Promise<void>;
+  loginAdmin: (username: string, password: string) => Promise<void>;
+  logoutAdmin: () => Promise<void>;
   registerBidder: (input: BidderRegistrationInput) => Promise<BidderSummary>;
   placeBid: (input: {
     artworkId: string;
@@ -77,6 +83,34 @@ const ONSITE_STORAGE_KEY = 'art_for_climate_mleuven_onsite';
 const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v5';
 const LOCAL_BILLING_KEY = 'art_for_climate_static_billing_v5';
 const LOCAL_SETTINGS_KEY = 'art_for_climate_static_settings_v5';
+const LOCAL_ADMIN_HASH_KEY = 'art_for_climate_static_admin_v5';
+
+interface StaticAdminRecord {
+  username: string;
+  salt: string;
+  hash: string;
+}
+
+async function deriveStaticHash(password: string, saltHex: string): Promise<string> {
+  const enc = new TextEncoder();
+  const data = enc.encode(`${saltHex}:${password}`);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function loadStaticAdminRecord(): StaticAdminRecord | null {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_ADMIN_HASH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StaticAdminRecord;
+    if (parsed.username && parsed.salt && parsed.hash) return parsed;
+  } catch {
+    // Negeer
+  }
+  return null;
+}
 
 function loadLocalFallbackSnapshot(): AuctionSnapshot {
   try {
@@ -124,6 +158,17 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const [organizerSettings, setOrganizerSettings] = useState<InvoiceOrganizerSettings>(
     DEFAULT_ORGANIZER_SETTINGS
   );
+
+  // Sessietoken blijft uitsluitend in geheugen (nooit in localStorage/sessionStorage)
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const authTokenRef = useRef<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AdminAuthStatus>({
+    configured: true,
+    hasEnvCredentials: false,
+    authenticated: false,
+    username: null,
+  });
+
   const [backendAvailable, setBackendAvailable] = useState<boolean>(true);
   const backendAvailableRef = useRef<boolean>(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -151,6 +196,11 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   });
+
+  const setMemoryToken = useCallback((token: string | null) => {
+    authTokenRef.current = token;
+    setAuthToken(token);
+  }, []);
 
   const persistLocalFallback = useCallback(
     (
@@ -191,6 +241,34 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refreshAuthStatus = useCallback(async () => {
+    if (!backendAvailableRef.current) {
+      const staticAdmin = loadStaticAdminRecord();
+      setAuthStatus((prev) => ({
+        configured: Boolean(staticAdmin),
+        hasEnvCredentials: false,
+        authenticated: Boolean(authTokenRef.current && staticAdmin),
+        username: authTokenRef.current && staticAdmin ? prev.username : null,
+      }));
+      return;
+    }
+    try {
+      const headers: Record<string, string> = {};
+      if (authTokenRef.current) {
+        headers.Authorization = `Bearer ${authTokenRef.current}`;
+      }
+      const res = await fetch('/api/auth/status', { headers });
+      if (!res.ok) return;
+      const data = (await res.json()) as AdminAuthStatus;
+      setAuthStatus(data);
+      if (!data.authenticated && authTokenRef.current) {
+        setMemoryToken(null);
+      }
+    } catch {
+      // Negeer
+    }
+  }, [setMemoryToken]);
+
   const refreshState = useCallback(async () => {
     try {
       const res = await fetch('/api/state');
@@ -207,7 +285,6 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       setSnapshot(data);
       setError(null);
     } catch {
-      // Statische Vercel/CDN-hosting: val naadloos terug op de gebundelde 44-werken catalogus
       backendAvailableRef.current = false;
       setBackendAvailable(false);
       setConnected(true);
@@ -228,7 +305,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       ch.onmessage = (ev) => {
         if (!backendAvailableRef.current && ev.data?.snapshot) {
           setSnapshot(ev.data.snapshot as AuctionSnapshot);
-          if (ev.data.billingProfiles) {
+          if (ev.data.billingProfiles && authTokenRef.current) {
             setBillingProfiles(ev.data.billingProfiles as BidderBillingProfile[]);
           }
           if (ev.data.organizerSettings) {
@@ -297,6 +374,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     };
 
     void refreshState().then(() => {
+      void refreshAuthStatus();
       if (backendAvailableRef.current) {
         connectSSE();
       }
@@ -309,7 +387,131 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         window.clearTimeout(reconnectTimer);
       }
     };
-  }, [refreshState]);
+  }, [refreshState, refreshAuthStatus]);
+
+  const adminFetch = useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      const headers: Record<string, string> = {
+        ...((options.headers as Record<string, string>) || {}),
+      };
+      if (authTokenRef.current) {
+        headers.Authorization = `Bearer ${authTokenRef.current}`;
+      }
+      const res = await fetch(url, { ...options, headers });
+      if (res.status === 401) {
+        setMemoryToken(null);
+        setBillingProfiles([]);
+        setAuthStatus((prev) => ({ ...prev, authenticated: false, username: null }));
+      }
+      return res;
+    },
+    [setMemoryToken]
+  );
+
+  const setupAdmin = useCallback(
+    async (username: string, password: string) => {
+      const cleanUser = username.trim();
+      if (!backendAvailableRef.current) {
+        const existing = loadStaticAdminRecord();
+        if (existing) {
+          throw new Error('Beheerderstoegang is reeds ingesteld.');
+        }
+        if (cleanUser.length < 3 || password.length < 4) {
+          throw new Error('Vul een geldige gebruikersnaam en wachtwoord in (min. 4 tekens).');
+        }
+        const saltBytes = window.crypto.getRandomValues(new Uint8Array(16));
+        const salt = Array.from(saltBytes)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        const hash = await deriveStaticHash(password, salt);
+        window.localStorage.setItem(
+          LOCAL_ADMIN_HASH_KEY,
+          JSON.stringify({ username: cleanUser, salt, hash })
+        );
+        const token = `static-${Date.now()}`;
+        setMemoryToken(token);
+        setAuthStatus({
+          configured: true,
+          hasEnvCredentials: false,
+          authenticated: true,
+          username: cleanUser,
+        });
+        return;
+      }
+
+      const res = await fetch('/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Instellen van beheerderstoegang mislukt.');
+      }
+      setMemoryToken(data.token as string);
+      setAuthStatus({
+        configured: true,
+        hasEnvCredentials: false,
+        authenticated: true,
+        username: data.username as string,
+      });
+    },
+    [setMemoryToken]
+  );
+
+  const loginAdmin = useCallback(
+    async (username: string, password: string) => {
+      const cleanUser = username.trim();
+      if (!backendAvailableRef.current) {
+        const rec = loadStaticAdminRecord();
+        if (!rec) {
+          throw new Error('Beheerderstoegang is nog niet ingesteld.');
+        }
+        const derived = await deriveStaticHash(password, rec.salt);
+        if (cleanUser !== rec.username || derived !== rec.hash) {
+          throw new Error('Ongeldige gebruikersnaam of wachtwoord.');
+        }
+        setMemoryToken(`static-${Date.now()}`);
+        setAuthStatus({
+          configured: true,
+          hasEnvCredentials: false,
+          authenticated: true,
+          username: rec.username,
+        });
+        return;
+      }
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Aanmelden mislukt.');
+      }
+      setMemoryToken(data.token as string);
+      await refreshAuthStatus();
+    },
+    [refreshAuthStatus, setMemoryToken]
+  );
+
+  const logoutAdmin = useCallback(async () => {
+    if (backendAvailableRef.current) {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // Negeer
+      }
+    }
+    setMemoryToken(null);
+    setBillingProfiles([]);
+    setAuthStatus((prev) => ({
+      ...prev,
+      authenticated: false,
+      username: null,
+    }));
+  }, [setMemoryToken]);
 
   const currentBidderNumber = useMemo(() => {
     return storedBidderNumber ? normalizeBidderNumber(storedBidderNumber) : null;
@@ -331,13 +533,14 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchBillingData = useCallback(async () => {
+    if (!authTokenRef.current) return;
     if (!backendAvailableRef.current) {
       setBillingProfiles(loadLocalBillingProfiles());
       setOrganizerSettings(loadLocalOrganizerSettings());
       return;
     }
     try {
-      const res = await fetch('/api/admin/billing');
+      const res = await adminFetch('/api/admin/billing');
       if (!res.ok) return;
       const data = (await res.json()) as {
         bidders: BidderBillingProfile[];
@@ -348,7 +551,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Negeer netwerkfout
     }
-  }, []);
+  }, [adminFetch]);
 
   const registerBidder = useCallback(
     async (input: BidderRegistrationInput) => {
@@ -358,45 +561,49 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Vul een geldig btw-nummer in voor facturatie (bv. BE 0544.963.123).');
         }
         const currentProfiles = loadLocalBillingProfiles();
-        const existingIdx = currentProfiles.findIndex(
+        const existingSameBoth = currentProfiles.find(
+          (b) =>
+            b.vatNumber === normalizedVat &&
+            b.email &&
+            b.email.toLowerCase() === input.email.trim().toLowerCase()
+        );
+        if (existingSameBoth) {
+          const summary: BidderSummary = {
+            bidderNumber: existingSameBoth.bidderNumber,
+            city: existingSameBoth.city,
+            registeredAt: existingSameBoth.registeredAt,
+          };
+          setCurrentBidderNumber(summary.bidderNumber);
+          return summary;
+        }
+        const existingConflict = currentProfiles.find(
           (b) =>
             b.vatNumber === normalizedVat ||
             (b.email && b.email.toLowerCase() === input.email.trim().toLowerCase())
         );
-
-        let profile: BidderBillingProfile;
-        if (existingIdx >= 0) {
-          profile = {
-            ...currentProfiles[existingIdx],
-            name: input.name.trim(),
-            companyName: input.companyName.trim(),
-            vatNumber: normalizedVat,
-            email: input.email.trim(),
-            street: input.street.trim(),
-            postalCode: input.postalCode.trim(),
-            city: input.city.trim(),
-            country: (input.country || 'België').trim(),
-          };
-          currentProfiles[existingIdx] = profile;
-        } else {
-          const maxNum = currentProfiles.reduce((m, b) => {
-            const p = Number.parseInt(b.bidderNumber.replace('#', ''), 10);
-            return Number.isFinite(p) && p > m ? p : m;
-          }, 0);
-          profile = {
-            bidderNumber: `#${String(maxNum + 1).padStart(3, '0')}`,
-            name: input.name.trim(),
-            companyName: input.companyName.trim(),
-            vatNumber: normalizedVat,
-            email: input.email.trim(),
-            street: input.street.trim(),
-            postalCode: input.postalCode.trim(),
-            city: input.city.trim(),
-            country: (input.country || 'België').trim(),
-            registeredAt: new Date().toISOString(),
-          };
-          currentProfiles.push(profile);
+        if (existingConflict) {
+          throw new Error(
+            'Dit e-mailadres of btw-nummer is reeds geregistreerd. Gebruik je eerder ontvangen biednummer.'
+          );
         }
+
+        const maxNum = currentProfiles.reduce((m, b) => {
+          const p = Number.parseInt(b.bidderNumber.replace('#', ''), 10);
+          return Number.isFinite(p) && p > m ? p : m;
+        }, 0);
+        const profile: BidderBillingProfile = {
+          bidderNumber: `#${String(maxNum + 1).padStart(3, '0')}`,
+          name: input.name.trim(),
+          companyName: input.companyName.trim(),
+          vatNumber: normalizedVat,
+          email: input.email.trim(),
+          street: input.street.trim(),
+          postalCode: input.postalCode.trim(),
+          city: input.city.trim(),
+          country: (input.country || 'België').trim(),
+          registeredAt: new Date().toISOString(),
+        };
+        currentProfiles.push(profile);
 
         const summary: BidderSummary = {
           bidderNumber: profile.bidderNumber,
@@ -405,13 +612,9 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         };
         const nextSnap: AuctionSnapshot = {
           ...snapshot,
-          bidders: [
-            ...snapshot.bidders.filter((b) => b.bidderNumber !== summary.bidderNumber),
-            summary,
-          ],
+          bidders: [...snapshot.bidders, summary],
         };
         setSnapshot(nextSnap);
-        setBillingProfiles(currentProfiles);
         persistLocalFallback(nextSnap, currentProfiles);
         setCurrentBidderNumber(summary.bidderNumber);
         return summary;
@@ -455,6 +658,9 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!backendAvailableRef.current) {
+        if (source === 'floor' && !authTokenRef.current) {
+          throw new Error('Enkel de aangemelde veilingmeester kan zaalbiedingen registreren.');
+        }
         if (snapshot.auctionState?.auctionClosed) {
           throw new Error('De veiling is afgesloten door de veilingmeester.');
         }
@@ -464,7 +670,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         if (artwork.status !== 'live') {
           throw new Error(`Biedingen zijn gesloten voor Lot ${artwork.lotNumber}.`);
         }
-        if (!Number.isInteger(input.amount) || input.amount <= artwork.currentBid) {
+        if (!Number.isInteger(input.amount) || input.amount <= artwork.currentBid || input.amount > 1_000_000) {
           throw new Error(
             `Het bod moet strikt hoger zijn dan € ${artwork.currentBid.toLocaleString('nl-BE')}.`
           );
@@ -525,7 +731,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
           bidders: nextBidders,
         };
         setSnapshot(nextSnap);
-        setBillingProfiles(currentProfiles);
+        if (authTokenRef.current) setBillingProfiles(currentProfiles);
         persistLocalFallback(nextSnap, currentProfiles);
         if (source !== 'floor') {
           setCurrentBidderNumber(targetNumber);
@@ -533,9 +739,14 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return { bid, artwork: updatedArtwork };
       }
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (source === 'floor' && authTokenRef.current) {
+        headers.Authorization = `Bearer ${authTokenRef.current}`;
+      }
+
       const res = await fetch('/api/bids', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           artworkId: input.artworkId,
           amount: input.amount,
@@ -597,7 +808,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return artwork;
       }
 
-      const res = await fetch('/api/artworks', {
+      const res = await adminFetch('/api/artworks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -606,7 +817,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(data.error || 'Kunstwerk toevoegen mislukt.');
       return data.artwork as Artwork;
     },
-    [persistLocalFallback, snapshot]
+    [adminFetch, persistLocalFallback, snapshot]
   );
 
   const updateArtwork = useCallback(
@@ -623,7 +834,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return updated;
       }
 
-      const res = await fetch(`/api/artworks/${encodeURIComponent(id)}`, {
+      const res = await adminFetch(`/api/artworks/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -632,7 +843,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(data.error || 'Kunstwerk bijwerken mislukt.');
       return data.artwork as Artwork;
     },
-    [persistLocalFallback, snapshot]
+    [adminFetch, persistLocalFallback, snapshot]
   );
 
   const deleteArtwork = useCallback(
@@ -648,13 +859,13 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const res = await fetch(`/api/artworks/${encodeURIComponent(id)}`, {
+      const res = await adminFetch(`/api/artworks/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Kunstwerk verwijderen mislukt.');
     },
-    [persistLocalFallback, snapshot]
+    [adminFetch, persistLocalFallback, snapshot]
   );
 
   const updateAuctionState = useCallback(
@@ -691,7 +902,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return nextState;
       }
 
-      const res = await fetch('/api/auction', {
+      const res = await adminFetch('/api/auction', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -700,7 +911,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(data.error || 'Veilingstatus bijwerken mislukt.');
       return data.auctionState as AuctionState;
     },
-    [persistLocalFallback, snapshot]
+    [adminFetch, persistLocalFallback, snapshot]
   );
 
   const importCatalogPdf = useCallback(
@@ -708,7 +919,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!backendAvailableRef.current) {
         throw new Error('PDF-verwerking vereist de Node-server; de 44 officiële werken zijn reeds actief.');
       }
-      const res = await fetch('/api/import/catalog-pdf', {
+      const res = await adminFetch('/api/import/catalog-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -723,7 +934,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         rawPreview?: string;
       };
     },
-    [refreshState]
+    [adminFetch, refreshState]
   );
 
   const uploadFloorplan = useCallback(
@@ -740,7 +951,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return input.dataUrl;
       }
 
-      const res = await fetch('/api/import/floorplan', {
+      const res = await adminFetch('/api/import/floorplan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -750,7 +961,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       await refreshState();
       return data.floorplanImageUrl as string;
     },
-    [persistLocalFallback, refreshState, snapshot]
+    [adminFetch, persistLocalFallback, refreshState, snapshot]
   );
 
   const uploadArtworkImage = useCallback(
@@ -758,7 +969,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!backendAvailableRef.current) {
         return input.dataUrl;
       }
-      const res = await fetch('/api/import/artwork-image', {
+      const res = await adminFetch('/api/import/artwork-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -767,7 +978,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error(data.error || 'Afbeelding opladen mislukt.');
       return data.imageUrl as string;
     },
-    []
+    [adminFetch]
   );
 
   const updateBillingProfile = useCallback(
@@ -806,7 +1017,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         return updated;
       }
 
-      const res = await fetch(
+      const res = await adminFetch(
         `/api/admin/bidders/${encodeURIComponent(bidderNumber)}`,
         {
           method: 'PATCH',
@@ -819,7 +1030,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       await fetchBillingData();
       return data.bidder as BidderBillingProfile;
     },
-    [fetchBillingData, persistLocalFallback, snapshot]
+    [adminFetch, fetchBillingData, persistLocalFallback, snapshot]
   );
 
   const updateOrganizerSettings = useCallback(
@@ -830,7 +1041,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         persistLocalFallback(snapshot, undefined, next);
         return next;
       }
-      const res = await fetch('/api/admin/invoice-settings', {
+      const res = await adminFetch('/api/admin/invoice-settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -840,7 +1051,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       setOrganizerSettings(data.organizerSettings as InvoiceOrganizerSettings);
       return data.organizerSettings as InvoiceOrganizerSettings;
     },
-    [organizerSettings, persistLocalFallback, snapshot]
+    [adminFetch, organizerSettings, persistLocalFallback, snapshot]
   );
 
   const resetAuction = useCallback(async () => {
@@ -851,12 +1062,14 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       persistLocalFallback(clean, []);
       return;
     }
-    const res = await fetch('/api/auction/reset', { method: 'POST' });
+    const res = await adminFetch('/api/auction/reset', { method: 'POST' });
     if (!res.ok) throw new Error('Veiling herstellen mislukt.');
     const data = (await res.json()) as AuctionSnapshot;
     setSnapshot(data);
     setBillingProfiles([]);
-  }, [persistLocalFallback]);
+  }, [adminFetch, persistLocalFallback]);
+
+  const isAdmin = Boolean(authToken && authStatus.authenticated);
 
   const value: AuctionContextValue = {
     artworks: snapshot.artworks,
@@ -865,6 +1078,8 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     auctionState: snapshot.auctionState ?? null,
     billingProfiles,
     organizerSettings,
+    authStatus,
+    isAdmin,
     currentBidderNumber,
     onSiteVerified: onSiteVerifiedState,
     setOnSiteVerified,
@@ -872,6 +1087,9 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     connected: connected || !backendAvailable,
     error,
     setCurrentBidderNumber,
+    setupAdmin,
+    loginAdmin,
+    logoutAdmin,
     registerBidder,
     placeBid,
     createArtwork,

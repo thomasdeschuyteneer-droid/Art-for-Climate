@@ -10,6 +10,7 @@ import { LiveRoom } from './components/LiveRoom';
 import { FloorplanView } from './components/FloorplanView';
 import { AuctioneerDashboard } from './components/AuctioneerDashboard';
 import { AdminPanel } from './components/AdminPanel';
+import { AdminAuthGate } from './components/AdminAuthGate';
 
 function parseRouteFromLocation(): AppRoute {
   if (typeof window === 'undefined') return { view: 'home' };
@@ -51,7 +52,7 @@ function routeToPath(route: AppRoute): string {
 }
 
 function AuctionShell() {
-  const { currentBidderNumber } = useAuction();
+  const { currentBidderNumber, isAdmin, logoutAdmin } = useAuction();
   const [route, setRoute] = useState<AppRoute>(() => parseRouteFromLocation());
   const [bidderModalOpen, setBidderModalOpen] = useState(false);
 
@@ -72,6 +73,14 @@ function AuctionShell() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleLogoutAdmin = () => {
+    void logoutAdmin().then(() => {
+      if (route.view === 'admin' || route.view === 'auctioneer') {
+        navigate({ view: 'home' });
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F7F7] text-[#363E49]">
       <HeaderNav
@@ -79,6 +88,8 @@ function AuctionShell() {
         onNavigate={navigate}
         bidderNumber={currentBidderNumber}
         onOpenBidderModal={() => setBidderModalOpen(true)}
+        isAdmin={isAdmin}
+        onLogoutAdmin={handleLogoutAdmin}
       />
 
       <main className="flex-1">
@@ -103,8 +114,24 @@ function AuctionShell() {
           />
         )}
         {route.view === 'floorplan' && <FloorplanView onNavigate={navigate} />}
-        {route.view === 'auctioneer' && <AuctioneerDashboard />}
-        {route.view === 'admin' && <AdminPanel />}
+        {route.view === 'auctioneer' &&
+          (isAdmin ? (
+            <AuctioneerDashboard />
+          ) : (
+            <AdminAuthGate
+              targetLabel="Veilingmeester"
+              onBack={() => navigate({ view: 'home' })}
+            />
+          ))}
+        {route.view === 'admin' &&
+          (isAdmin ? (
+            <AdminPanel />
+          ) : (
+            <AdminAuthGate
+              targetLabel="Beheer"
+              onBack={() => navigate({ view: 'home' })}
+            />
+          ))}
       </main>
 
       <footer className="border-t border-[#E5E5E5] bg-white py-10 mb-14 lg:mb-0 no-print">
@@ -127,6 +154,7 @@ function AuctionShell() {
               </p>
             </div>
           </div>
+
           <div className="flex flex-wrap items-center gap-5 font-semibold text-[#363E49]">
             <button
               type="button"
@@ -156,25 +184,37 @@ function AuctionShell() {
             >
               M Leuven
             </button>
-            <button
-              type="button"
-              onClick={() => navigate({ view: 'auctioneer' })}
-              className="hover:text-[#19706D] cursor-pointer"
-            >
-              Veilingmeester
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate({ view: 'admin' })}
-              className="hover:text-[#19706D] cursor-pointer"
-            >
-              Beheer
-            </button>
+            {isAdmin ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate({ view: 'auctioneer' })}
+                  className="hover:text-[#19706D] cursor-pointer"
+                >
+                  Veilingmeester
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate({ view: 'admin' })}
+                  className="hover:text-[#19706D] cursor-pointer"
+                >
+                  Beheer
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate({ view: 'admin' })}
+                className="text-[#5D6C7B]/75 hover:text-[#19706D] font-normal cursor-pointer"
+              >
+                Organisatie
+              </button>
+            )}
           </div>
         </div>
       </footer>
 
-      <MobileTabBar route={route} onNavigate={navigate} />
+      <MobileTabBar route={route} onNavigate={navigate} isAdmin={isAdmin} />
       <BidderModal
         open={bidderModalOpen}
         onClose={() => setBidderModalOpen(false)}

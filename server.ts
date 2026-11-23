@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,7 +34,9 @@ function resolveWritableDataDir(): string {
 const DATA_DIR = resolveWritableDataDir();
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'auction-db.json');
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 type LotStatus = 'upcoming' | 'live' | 'sold' | 'passed';
 type HammerStage = 'open' | 'going_once' | 'going_twice' | 'hammer_down';
@@ -147,6 +150,13 @@ interface AuctionState {
   updatedAt: string;
 }
 
+interface AdminCredentialRecord {
+  username: string;
+  passwordHash: string;
+  salt: string;
+  claimedAt: string;
+}
+
 interface AuctionDB {
   schemaVersion: number;
   artworks: Artwork[];
@@ -154,6 +164,7 @@ interface AuctionDB {
   bidders: BidderRecord[];
   organizerSettings: InvoiceOrganizerSettings;
   auctionState: AuctionState;
+  adminCredential?: AdminCredentialRecord | null;
 }
 
 function loadOfficialCatalogSeed(): OfficialCatalogItem[] {
@@ -252,6 +263,7 @@ function createInitialSeed(): AuctionDB {
       vatMode: 'exempt_charity',
     },
     auctionState,
+    adminCredential: null,
   };
 }
 
@@ -268,6 +280,9 @@ function loadDB(): AuctionDB {
     const parsed = JSON.parse(raw) as AuctionDB;
     if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION) {
       const seeded = createInitialSeed();
+      if (parsed.adminCredential) {
+        seeded.adminCredential = parsed.adminCredential;
+      }
       fs.writeFileSync(DB_FILE, JSON.stringify(seeded, null, 2), 'utf-8');
       return seeded;
     }
@@ -280,6 +295,104 @@ function loadDB(): AuctionDB {
 }
 
 let db: AuctionDB = loadDB();
+let activeSessionEpoch = 1;
+
+function getEnvAdminCredentials(): { username: string; password: string } | null {
+  const username = process.env.ADMIN_USERNAME?.trim() || '';
+  const password = process.env.ADMIN_PASSWORD || '';
+  if (username && password) {
+    return { username, password };
+  }
+  return null;
+}
+
+function timingSafeCompareText(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  if (bufA.length !== bufB.length) {
+    // Vergelijk constante lengte om timingverschillen te vermijden
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function hashPasswordScrypt(password: string, saltHex: string): string {
+  return crypto.scryptSync(password, saltHex, 64).toString('hex');
+}
+
+function verifyPasswordScrypt(password: string, saltHex: string, storedHashHex: string): boolean {
+  const derived = crypto.scryptSync(password, saltHex, 64);
+  const expected = Buffer.from(storedHashHex, 'hex');
+  if (derived.length !== expected.length) return false;
+  return crypto.timingSafeEqual(derived, expected);
+}
+
+function signAdminToken(username: string): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      u: username,
+      ep: activeSessionEpoch,
+      exp: Date.now() + SESSION_TTL_MS,
+    })
+  ).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifyAdminFromRequest(req: express.Request): { username: string } | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [payloadB64, sig] = parts;
+  if (!payloadB64 || !sig) return null;
+
+  const expectedSig = crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(payloadB64)
+    .digest('base64url');
+  if (!timingSafeCompareText(sig, expectedSig)) return null;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8')) as {
+      u?: string;
+      ep?: number;
+      exp?: number;
+    };
+    if (!parsed.u || !parsed.exp || parsed.exp < Date.now()) return null;
+    if (parsed.ep !== activeSessionEpoch) return null;
+    return { username: parsed.u };
+  } catch {
+    return null;
+  }
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const verified = verifyAdminFromRequest(req);
+  if (!verified) {
+    res.status(401).json({ error: 'Beheerdersauthenticatie vereist. Meld je aan als beheerder.' });
+    return;
+  }
+  next();
+}
+
+function createRateLimiter(windowMs: number, maxRequests: number, errorMessage: string) {
+  const hits = new Map<string, number[]>();
+  return (req: express.Request, res: express.Response, next: express.NextFunction): void => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const recent = (hits.get(ip) ?? []).filter((ts) => now - ts < windowMs);
+    if (recent.length >= maxRequests) {
+      res.status(429).json({ error: errorMessage });
+      return;
+    }
+    recent.push(now);
+    hits.set(ip, recent);
+    next();
+  };
+}
 
 function persistDB(): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -452,8 +565,114 @@ async function startServer(): Promise<void> {
     app.use(express.static(PUBLIC_DIR));
   }
 
+  const authLimiter = createRateLimiter(
+    15 * 60 * 1000,
+    10,
+    'Te veel aanmeldpogingen. Wacht even en probeer opnieuw.'
+  );
+  const bidderRegLimiter = createRateLimiter(
+    10 * 60 * 1000,
+    15,
+    'Te veel inschrijvingen vanaf dit toestel. Probeer later opnieuw.'
+  );
+  const bidLimiter = createRateLimiter(
+    60 * 1000,
+    30,
+    'Je brengt te snel opeenvolgende biedingen uit. Wacht enkele seconden.'
+  );
+
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, time: new Date().toISOString() });
+  });
+
+  app.get('/api/auth/status', (req, res) => {
+    const envCreds = getEnvAdminCredentials();
+    const hasClaimed = Boolean(db.adminCredential?.passwordHash);
+    const verified = verifyAdminFromRequest(req);
+    res.json({
+      configured: Boolean(envCreds) || hasClaimed,
+      hasEnvCredentials: Boolean(envCreds),
+      authenticated: Boolean(verified),
+      username: verified?.username ?? null,
+    });
+  });
+
+  app.post('/api/auth/setup', authLimiter, (req, res) => {
+    const envCreds = getEnvAdminCredentials();
+    if (envCreds || db.adminCredential?.passwordHash) {
+      res.status(409).json({
+        error: 'Beheerderstoegang is reeds ingesteld. Gebruik het aanmeldformulier.',
+      });
+      return;
+    }
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (username.length < 3 || username.length > 64) {
+      res.status(400).json({ error: 'Gebruikersnaam moet tussen 3 en 64 tekens lang zijn.' });
+      return;
+    }
+    if (password.length < 4 || password.length > 128) {
+      res.status(400).json({ error: 'Wachtwoord moet minstens 4 tekens lang zijn.' });
+      return;
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = hashPasswordScrypt(password, salt);
+    db.adminCredential = {
+      username,
+      passwordHash,
+      salt,
+      claimedAt: new Date().toISOString(),
+    };
+    persistDB();
+
+    const token = signAdminToken(username);
+    res.status(201).json({ token, username });
+  });
+
+  app.post('/api/auth/login', authLimiter, (req, res) => {
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    const envCreds = getEnvAdminCredentials();
+    if (envCreds) {
+      const userOk = timingSafeCompareText(username, envCreds.username);
+      const passOk = timingSafeCompareText(password, envCreds.password);
+      if (!userOk || !passOk) {
+        res.status(401).json({ error: 'Ongeldige gebruikersnaam of wachtwoord.' });
+        return;
+      }
+      const token = signAdminToken(envCreds.username);
+      res.json({ token, username: envCreds.username });
+      return;
+    }
+
+    if (!db.adminCredential?.passwordHash) {
+      res.status(409).json({
+        error: 'Er is nog geen beheerdersaccount ingesteld. Stel eerst de toegang in.',
+      });
+      return;
+    }
+
+    const userOk = timingSafeCompareText(username, db.adminCredential.username);
+    const passOk = verifyPasswordScrypt(
+      password,
+      db.adminCredential.salt,
+      db.adminCredential.passwordHash
+    );
+    if (!userOk || !passOk) {
+      res.status(401).json({ error: 'Ongeldige gebruikersnaam of wachtwoord.' });
+      return;
+    }
+
+    const token = signAdminToken(db.adminCredential.username);
+    res.json({ token, username: db.adminCredential.username });
+  });
+
+  app.post('/api/auth/logout', (_req, res) => {
+    activeSessionEpoch += 1;
+    res.json({ ok: true });
   });
 
   app.get('/api/state', (_req, res) => {
@@ -488,7 +707,7 @@ async function startServer(): Promise<void> {
     });
   });
 
-  app.post('/api/bidders', (req, res) => {
+  app.post('/api/bidders', bidderRegLimiter, (req, res) => {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const companyName = typeof req.body?.companyName === 'string' ? req.body.companyName.trim() : '';
     const rawVat = typeof req.body?.vatNumber === 'string' ? req.body.vatNumber.trim() : '';
@@ -528,28 +747,34 @@ async function startServer(): Promise<void> {
       return;
     }
 
-    const existing = db.bidders.find(
+    const existingSameBoth = db.bidders.find(
+      (b) =>
+        b.email &&
+        b.vatNumber &&
+        b.email.toLowerCase() === email.toLowerCase() &&
+        b.vatNumber === normalizedVat
+    );
+    if (existingSameBoth) {
+      res.json({
+        bidder: {
+          bidderNumber: existingSameBoth.bidderNumber,
+          city: existingSameBoth.city,
+          registeredAt: existingSameBoth.registeredAt,
+        },
+        existing: true,
+      });
+      return;
+    }
+
+    const existingConflict = db.bidders.find(
       (b) =>
         (b.email && b.email.toLowerCase() === email.toLowerCase()) ||
         (b.vatNumber && b.vatNumber === normalizedVat)
     );
-    if (existing) {
-      existing.name = name.slice(0, 80);
-      existing.companyName = companyName.slice(0, 120);
-      existing.vatNumber = normalizedVat;
-      existing.email = email.slice(0, 120);
-      existing.street = street.slice(0, 140);
-      existing.postalCode = postalCode.slice(0, 20);
-      existing.city = city.slice(0, 60);
-      existing.country = (country || 'België').slice(0, 60);
-      persistDB();
-      res.json({
-        bidder: {
-          bidderNumber: existing.bidderNumber,
-          city: existing.city,
-          registeredAt: existing.registeredAt,
-        },
-        existing: true,
+    if (existingConflict) {
+      res.status(409).json({
+        error:
+          'Dit e-mailadres of btw-nummer is reeds geregistreerd. Gebruik je eerder ontvangen biednummer of vraag hulp aan het onthaal in M Leuven.',
       });
       return;
     }
@@ -585,15 +810,15 @@ async function startServer(): Promise<void> {
     });
   });
 
-  // Vertrouwelijke facturatie-eindpunten uitsluitend voor het beheerpaneel
-  app.get('/api/admin/billing', (_req, res) => {
+  // Vertrouwelijke facturatie-eindpunten uitsluitend voor aangemelde beheerders
+  app.get('/api/admin/billing', requireAdmin, (_req, res) => {
     res.json({
       bidders: db.bidders,
       organizerSettings: db.organizerSettings,
     });
   });
 
-  app.patch('/api/admin/bidders/:bidderNumber', (req, res) => {
+  app.patch('/api/admin/bidders/:bidderNumber', requireAdmin, (req, res) => {
     const normalizedNum = normalizeBidderInput(req.params.bidderNumber);
     if (!normalizedNum) {
       res.status(400).json({ error: 'Ongeldig biednummer.' });
@@ -640,7 +865,7 @@ async function startServer(): Promise<void> {
     res.json({ bidder });
   });
 
-  app.patch('/api/admin/invoice-settings', (req, res) => {
+  app.patch('/api/admin/invoice-settings', requireAdmin, (req, res) => {
     const s = db.organizerSettings;
     if (typeof req.body?.legalName === 'string' && req.body.legalName.trim()) {
       s.legalName = req.body.legalName.trim().slice(0, 140);
@@ -681,11 +906,17 @@ async function startServer(): Promise<void> {
     res.json({ organizerSettings: s });
   });
 
-  app.post('/api/bids', (req, res) => {
+  app.post('/api/bids', bidLimiter, (req, res) => {
     const artworkId = typeof req.body?.artworkId === 'string' ? req.body.artworkId.trim() : '';
     const rawBidderNumber = typeof req.body?.bidderNumber === 'string' ? req.body.bidderNumber.trim() : '';
     const amount = Number(req.body?.amount);
-    const source: 'qr' | 'floor' = req.body?.source === 'floor' ? 'floor' : 'qr';
+    const isAdminCaller = verifyAdminFromRequest(req) !== null;
+    const requestedFloor = req.body?.source === 'floor';
+    if (requestedFloor && !isAdminCaller) {
+      res.status(401).json({ error: 'Enkel de veilingmeester kan zaalbiedingen rechtstreeks ingeven.' });
+      return;
+    }
+    const source: 'qr' | 'floor' = requestedFloor && isAdminCaller ? 'floor' : 'qr';
     const onSiteVerified = Boolean(req.body?.onSiteVerified) || source === 'floor';
 
     if (db.auctionState.auctionClosed) {
@@ -741,8 +972,8 @@ async function startServer(): Promise<void> {
       db.bidders.push(bidder);
     }
 
-    if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
-      res.status(400).json({ error: 'Het bod moet een geheel bedrag in euro zijn.' });
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount) || amount > 1_000_000) {
+      res.status(400).json({ error: 'Het bod moet een geldig geheel bedrag in euro zijn (max. € 1.000.000).' });
       return;
     }
 
@@ -788,7 +1019,7 @@ async function startServer(): Promise<void> {
     res.status(201).json({ bid: newBid, artwork });
   });
 
-  app.post('/api/artworks', (req, res) => {
+  app.post('/api/artworks', requireAdmin, (req, res) => {
     const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
     const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
     if (!title || !artist) {
@@ -844,7 +1075,7 @@ async function startServer(): Promise<void> {
     res.status(201).json({ artwork });
   });
 
-  app.patch('/api/artworks/:id', (req, res) => {
+  app.patch('/api/artworks/:id', requireAdmin, (req, res) => {
     const artwork = db.artworks.find((a) => a.id === req.params.id);
     if (!artwork) {
       res.status(404).json({ error: 'Kunstwerk niet gevonden.' });
@@ -913,7 +1144,7 @@ async function startServer(): Promise<void> {
     res.json({ artwork });
   });
 
-  app.delete('/api/artworks/:id', (req, res) => {
+  app.delete('/api/artworks/:id', requireAdmin, (req, res) => {
     const index = db.artworks.findIndex((a) => a.id === req.params.id);
     if (index === -1) {
       res.status(404).json({ error: 'Kunstwerk niet gevonden.' });
@@ -929,7 +1160,7 @@ async function startServer(): Promise<void> {
     res.json({ deletedId: removed.id });
   });
 
-  app.post('/api/import/catalog-pdf', async (req, res) => {
+  app.post('/api/import/catalog-pdf', requireAdmin, async (req, res) => {
     try {
       const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName.trim() : 'catalogus.pdf';
       const base64Data = typeof req.body?.base64 === 'string' ? req.body.base64 : '';
@@ -1041,23 +1272,29 @@ async function startServer(): Promise<void> {
     }
   });
 
-  app.post('/api/import/floorplan', (req, res) => {
+  app.post('/api/import/floorplan', requireAdmin, (req, res) => {
     try {
       const dataUrl = typeof req.body?.dataUrl === 'string' ? req.body.dataUrl : '';
       const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName : 'grondplan.png';
-      if (!dataUrl.startsWith('data:image/')) {
-        res.status(400).json({ error: 'Gelieve een geldige afbeelding (PNG, JPG of SVG) te kiezen.' });
-        return;
-      }
-      const match = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+      const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        res.status(400).json({ error: 'Ongeldig afbeeldingsformaat.' });
+        res.status(400).json({ error: 'Gelieve een geldige rasterafbeelding (PNG, JPG of WEBP) te kiezen.' });
         return;
       }
-      const ext = match[1].includes('svg') ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 8 * 1024 * 1024) {
+        res.status(413).json({ error: 'Afbeelding is te groot (max. 8 MB).' });
+        return;
+      }
+      const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
       const savedName = `grondplan-m-leuven-${Date.now()}.${ext}`;
       fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-      fs.writeFileSync(path.resolve(UPLOADS_DIR, savedName), Buffer.from(match[2], 'base64'));
+      const targetPath = path.resolve(UPLOADS_DIR, savedName);
+      if (!targetPath.startsWith(UPLOADS_DIR + path.sep)) {
+        res.status(400).json({ error: 'Ongeldig bestandspad.' });
+        return;
+      }
+      fs.writeFileSync(targetPath, buffer);
 
       db.auctionState.floorplanImageUrl = `/uploads/${savedName}`;
       db.auctionState.updatedAt = new Date().toISOString();
@@ -1071,18 +1308,28 @@ async function startServer(): Promise<void> {
     }
   });
 
-  app.post('/api/import/artwork-image', (req, res) => {
+  app.post('/api/import/artwork-image', requireAdmin, (req, res) => {
     try {
       const dataUrl = typeof req.body?.dataUrl === 'string' ? req.body.dataUrl : '';
-      const match = dataUrl.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+      const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|webp);base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        res.status(400).json({ error: 'Ongeldige afbeelding.' });
+        res.status(400).json({ error: 'Ongeldige afbeelding (kies PNG, JPG of WEBP).' });
         return;
       }
-      const ext = match[1].includes('svg') ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 8 * 1024 * 1024) {
+        res.status(413).json({ error: 'Afbeelding is te groot (max. 8 MB).' });
+        return;
+      }
+      const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
       const savedName = `kunstwerk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-      fs.writeFileSync(path.resolve(UPLOADS_DIR, savedName), Buffer.from(match[2], 'base64'));
+      const targetPath = path.resolve(UPLOADS_DIR, savedName);
+      if (!targetPath.startsWith(UPLOADS_DIR + path.sep)) {
+        res.status(400).json({ error: 'Ongeldig bestandspad.' });
+        return;
+      }
+      fs.writeFileSync(targetPath, buffer);
       res.json({ imageUrl: `/uploads/${savedName}` });
     } catch (err) {
       res.status(500).json({
@@ -1091,7 +1338,7 @@ async function startServer(): Promise<void> {
     }
   });
 
-  app.patch('/api/auction', (req, res) => {
+  app.patch('/api/auction', requireAdmin, (req, res) => {
     const {
       activeLotId,
       hammerStage,
@@ -1179,8 +1426,10 @@ async function startServer(): Promise<void> {
     res.json({ auctionState: db.auctionState });
   });
 
-  app.post('/api/auction/reset', (_req, res) => {
+  app.post('/api/auction/reset', requireAdmin, (_req, res) => {
+    const preservedAdmin = db.adminCredential ?? null;
     db = createInitialSeed();
+    db.adminCredential = preservedAdmin;
     persistDB();
     broadcastState('auction_reset');
     res.json(getPublicSnapshot());

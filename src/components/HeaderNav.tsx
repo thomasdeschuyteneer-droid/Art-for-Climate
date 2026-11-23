@@ -1,3 +1,5 @@
+import { LogOut } from 'lucide-react';
+
 export type AppRoute =
   | { view: 'home' }
   | { view: 'gallery' }
@@ -12,6 +14,8 @@ interface HeaderNavProps {
   onNavigate: (next: AppRoute) => void;
   bidderNumber: string | null;
   onOpenBidderModal: () => void;
+  isAdmin: boolean;
+  onLogoutAdmin: () => void;
 }
 
 export function HeaderNav({
@@ -19,15 +23,22 @@ export function HeaderNav({
   onNavigate,
   bidderNumber,
   onOpenBidderModal,
+  isAdmin,
+  onLogoutAdmin,
 }: HeaderNavProps) {
-  const navItems: Array<{ label: string; view: AppRoute['view']; href: string; target: AppRoute }> = [
+  const publicNavItems: Array<{ label: string; view: AppRoute['view']; href: string; target: AppRoute }> = [
     { label: 'Startpagina', view: 'home', href: '/', target: { view: 'home' } },
     { label: 'Kunstwerken', view: 'gallery', href: '/kunstwerken', target: { view: 'gallery' } },
     { label: 'Live veiling', view: 'live', href: '/live', target: { view: 'live' } },
     { label: 'M Leuven', view: 'floorplan', href: '/grondplan', target: { view: 'floorplan' } },
+  ];
+
+  const adminNavItems: Array<{ label: string; view: AppRoute['view']; href: string; target: AppRoute }> = [
     { label: 'Veilingmeester', view: 'auctioneer', href: '/veilingmeester', target: { view: 'auctioneer' } },
     { label: 'Beheer', view: 'admin', href: '/beheer', target: { view: 'admin' } },
   ];
+
+  const navItems = isAdmin ? [...publicNavItems, ...adminNavItems] : publicNavItems;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] no-print">
@@ -51,7 +62,7 @@ export function HeaderNav({
           </span>
         </a>
 
-        {/* Zone 2: Rustige Nederlandstalige navigatie */}
+        {/* Zone 2: Rustige Nederlandstalige navigatie (Beheer & Veilingmeester verborgen voor bezoekers) */}
         <nav
           aria-label="Hoofdnavigatie"
           className="hidden lg:flex items-center gap-6 text-[15px] font-semibold text-[#363E49]"
@@ -80,8 +91,8 @@ export function HeaderNav({
           })}
         </nav>
 
-        {/* Zone 3: Primaire actieknop in Leuven 2030 stijl */}
-        <div className="flex items-center shrink-0">
+        {/* Zone 3: Primaire actieknop & optioneel beheerdersafmelding */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onOpenBidderModal}
@@ -93,6 +104,19 @@ export function HeaderNav({
           >
             {bidderNumber ? `Bieder ${bidderNumber}` : 'Schrijf je in'}
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={onLogoutAdmin}
+              title="Beheerder afmelden"
+              aria-label="Beheerder afmelden"
+              className="min-h-[42px] px-3 py-2 text-xs font-bold rounded-[12px] border border-[#E5E5E5] bg-white text-[#5D6C7B] hover:text-[#923636] hover:border-[#923636] inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Afmelden</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
