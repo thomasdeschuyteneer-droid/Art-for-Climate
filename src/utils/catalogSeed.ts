@@ -74,7 +74,7 @@ export function buildInitialSeedSnapshot(): AuctionSnapshot {
   const defaultDuration = 180;
   const auctionState: AuctionState = {
     title: 'Art for Climate',
-    slogan: 'Kunst vandaag. Impact morgen.',
+    slogan: 'Meer kunst, meer toekomst',
     organization: 'Leuven 2030',
     location: 'M Leuven, Leopold Vanderkelenstraat 28',
     eventDateLabel: 'Woensdag 16 december 2026 · 16:00 uur',

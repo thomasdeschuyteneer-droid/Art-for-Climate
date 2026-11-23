@@ -227,7 +227,7 @@ function createInitialSeed(): AuctionDB {
 
   const auctionState: AuctionState = {
     title: 'Art for Climate',
-    slogan: 'Kunst vandaag. Impact morgen.',
+    slogan: 'Meer kunst, meer toekomst',
     organization: 'Leuven 2030',
     location: 'M Leuven, Leopold Vanderkelenstraat 28',
     eventDateLabel: 'Woensdag 16 december 2026 · 16:00 uur',
@@ -297,6 +297,10 @@ function loadDB(): AuctionDB {
       }
       fs.writeFileSync(DB_FILE, JSON.stringify(seeded, null, 2), 'utf-8');
       return seeded;
+    }
+    if (parsed.auctionState?.slogan === 'Kunst vandaag. Impact morgen.') {
+      parsed.auctionState.slogan = 'Meer kunst, meer toekomst';
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
     }
     return parsed;
   } catch {

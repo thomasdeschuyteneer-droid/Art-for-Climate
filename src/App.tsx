@@ -156,7 +156,7 @@ function AuctionShell() {
                 Art for Climate · Leuven 2030
               </p>
               <p className="mt-0.5 font-semibold text-[#363E49]">
-                Kunst vandaag. Impact morgen.
+                Meer kunst, meer toekomst
               </p>
               <p className="mt-0.5">
                 M Leuven, Leopold Vanderkelenstraat 28, 3000 Leuven · Ten voordele van het Leuvens Klimaatfonds

@@ -49,7 +49,7 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                   Art for Climate
                 </h1>
                 <p className="font-display text-xl sm:text-2xl font-bold text-[#363E49] mt-2">
-                  Kunst vandaag. Impact morgen.
+                  Meer kunst, meer toekomst
                 </p>
 
                 <p className="mt-5 text-base sm:text-lg text-[#5D6C7B] max-w-2xl leading-relaxed">
