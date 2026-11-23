@@ -11,6 +11,7 @@ import {
 } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { CountdownClock } from './CountdownClock';
+import { FavoriteButton } from './FavoriteButton';
 import type { AppRoute } from './HeaderNav';
 
 interface LiveRoomProps {
@@ -133,16 +134,19 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
                   {activeLot.title ? `${activeLot.artist} · ${activeLot.medium}` : activeLot.medium}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  onNavigate({ view: 'artwork', artworkId: activeLot.id })
-                }
-                className="min-h-[40px] px-4 py-2 rounded-[10px] border border-[#E5E5E5] text-xs font-bold text-[#363E49] hover:border-[#19706D] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span>Bekijk kunstwerk</span>
-                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <FavoriteButton artworkId={activeLot.id} lotNumber={activeLot.lotNumber} />
+                <button
+                  type="button"
+                  onClick={() =>
+                    onNavigate({ view: 'artwork', artworkId: activeLot.id })
+                  }
+                  className="min-h-[40px] px-4 py-2 rounded-[10px] border border-[#E5E5E5] text-xs font-bold text-[#363E49] hover:border-[#19706D] inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <span>Bekijk kunstwerk</span>
+                  <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
 
             <ArtworkImageFrame
@@ -325,17 +329,24 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
                 {artworks.map((lot) => {
                   const isSpotlit = lot.id === activeLot.id;
                   return (
-                    <button
+                    <div
                       key={lot.id}
-                      type="button"
                       onClick={() =>
                         onNavigate({ view: 'artwork', artworkId: lot.id })
                       }
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onNavigate({ view: 'artwork', artworkId: lot.id });
+                        }
+                      }}
                       className={`w-full py-3 px-2.5 text-left rounded-xl flex items-center justify-between gap-3 hover:bg-[#F7F7F7] transition-colors cursor-pointer ${
                         isSpotlit ? 'bg-[#F0F3E1]' : ''
                       }`}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-mono text-[11px] text-[#5D6C7B] tabular-nums">
                           {formatLotNumber(lot.lotNumber)} · {getStatusLabel(lot.status)}
                         </p>
@@ -343,19 +354,22 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
                           {lot.title || lot.artist}
                         </p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-mono text-sm font-bold text-[#19706D] tabular-nums">
-                          {lot.currentBid > 0
-                            ? formatEuro(lot.currentBid)
-                            : formatEuro(lot.startingBid)}
-                        </p>
-                        {lot.highestBidderNumber && (
-                          <p className="font-mono text-[11px] font-bold text-[#1E5941] tabular-nums">
-                            {lot.highestBidderNumber}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <p className="font-mono text-sm font-bold text-[#19706D] tabular-nums">
+                            {lot.currentBid > 0
+                              ? formatEuro(lot.currentBid)
+                              : formatEuro(lot.startingBid)}
                           </p>
-                        )}
+                          {lot.highestBidderNumber && (
+                            <p className="font-mono text-[11px] font-bold text-[#1E5941] tabular-nums">
+                              {lot.highestBidderNumber}
+                            </p>
+                          )}
+                        </div>
+                        <FavoriteButton artworkId={lot.id} lotNumber={lot.lotNumber} />
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

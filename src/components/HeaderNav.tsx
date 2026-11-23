@@ -1,8 +1,9 @@
-import { LogOut } from 'lucide-react';
+import { Heart, LogOut } from 'lucide-react';
 
 export type AppRoute =
   | { view: 'home' }
   | { view: 'gallery' }
+  | { view: 'favorites' }
   | { view: 'artwork'; artworkId: string }
   | { view: 'live' }
   | { view: 'floorplan' }
@@ -16,6 +17,7 @@ interface HeaderNavProps {
   onOpenBidderModal: () => void;
   isAdmin: boolean;
   onLogoutAdmin: () => void;
+  favoritesCount: number;
 }
 
 export function HeaderNav({
@@ -25,10 +27,12 @@ export function HeaderNav({
   onOpenBidderModal,
   isAdmin,
   onLogoutAdmin,
+  favoritesCount,
 }: HeaderNavProps) {
   const publicNavItems: Array<{ label: string; view: AppRoute['view']; href: string; target: AppRoute }> = [
     { label: 'Startpagina', view: 'home', href: '/', target: { view: 'home' } },
     { label: 'Kunstwerken', view: 'gallery', href: '/kunstwerken', target: { view: 'gallery' } },
+    { label: 'Favorieten', view: 'favorites', href: '/favorieten', target: { view: 'favorites' } },
     { label: 'Live veiling', view: 'live', href: '/live', target: { view: 'live' } },
     { label: 'M Leuven', view: 'floorplan', href: '/grondplan', target: { view: 'floorplan' } },
   ];
@@ -79,13 +83,24 @@ export function HeaderNav({
                   e.preventDefault();
                   onNavigate(item.target);
                 }}
-                className={`py-2 border-b-2 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#19706D] ${
+                className={`py-2 border-b-2 transition-colors whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#19706D] ${
                   isActive
                     ? 'border-[#19706D] text-[#19706D]'
                     : 'border-transparent hover:text-[#19706D] hover:border-[#DEE9EC]'
                 }`}
               >
-                {item.label}
+                {item.view === 'favorites' && (
+                  <Heart
+                    className={`w-3.5 h-3.5 ${favoritesCount > 0 ? 'fill-[#923636] text-[#923636]' : ''}`}
+                    aria-hidden="true"
+                  />
+                )}
+                <span>{item.label}</span>
+                {item.view === 'favorites' && favoritesCount > 0 && (
+                  <span className="font-mono text-xs font-bold text-[#923636] tabular-nums">
+                    ({favoritesCount})
+                  </span>
+                )}
               </a>
             );
           })}

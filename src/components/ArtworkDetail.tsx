@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Heart,
   Maximize2,
   X,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import {
 } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { CountdownClock } from './CountdownClock';
+import { FavoriteButton } from './FavoriteButton';
 import { QrCodeCard } from './QrCodeCard';
 import type { AppRoute } from './HeaderNav';
 
@@ -40,6 +42,8 @@ export function ArtworkDetail({
     onSiteVerified,
     setOnSiteVerified,
     placeBid,
+    favoriteIds,
+    isFavorite,
   } = useAuction();
   const [zoomed, setZoomed] = useState(false);
 
@@ -268,6 +272,29 @@ export function ArtworkDetail({
                 {artwork.artist}
               </p>
             )}
+
+            {/* Direct favoriet-hartje (ideaal na scannen QR-code in M Leuven) */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <FavoriteButton
+                artworkId={artwork.id}
+                lotNumber={artwork.lotNumber}
+                variant="button"
+              />
+              {isFavorite(artwork.id) && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate({ view: 'favorites' })}
+                  className="min-h-[44px] px-4 py-2 rounded-[12px] bg-[#F7F7F7] hover:bg-[#DEE9EC] border border-[#E5E5E5] text-xs font-bold text-[#19706D] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Heart className="w-3.5 h-3.5 fill-[#923636] text-[#923636]" aria-hidden="true" />
+                  <span>
+                    Bekijk mijn favorieten (
+                    {artworks.filter((a) => favoriteIds.includes(a.id)).length})
+                  </span>
+                </button>
+              )}
+            </div>
+
             <p className="text-sm sm:text-base text-[#363E49] leading-relaxed mt-4">
               {artwork.description}
             </p>

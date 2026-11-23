@@ -75,11 +75,16 @@ interface AuctionContextValue {
   ) => Promise<InvoiceOrganizerSettings>;
   resetAuction: () => Promise<void>;
   refreshState: () => Promise<void>;
+  favoriteIds: string[];
+  isFavorite: (artworkId: string) => boolean;
+  toggleFavorite: (artworkId: string) => void;
+  clearFavorites: () => void;
 }
 
 const AuctionContext = createContext<AuctionContextValue | null>(null);
 const BIDDER_STORAGE_KEY = 'art_for_climate_bidder_number';
 const ONSITE_STORAGE_KEY = 'art_for_climate_mleuven_onsite';
+const FAVORITES_STORAGE_KEY = 'art_for_climate_favorites_v1';
 const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v12b';
 const LOCAL_BILLING_KEY = 'art_for_climate_static_billing_v5';
 const LOCAL_SETTINGS_KEY = 'art_for_climate_static_settings_v5';
@@ -152,6 +157,22 @@ function loadLocalOrganizerSettings(): InvoiceOrganizerSettings {
   return DEFAULT_ORGANIZER_SETTINGS;
 }
 
+function loadStoredFavorites(): string[] {
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return Array.from(
+        new Set(parsed.filter((id): id is string => typeof id === 'string' && id.length > 0))
+      );
+    }
+  } catch {
+    // Negeer opslagfout
+  }
+  return [];
+}
+
 export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const [snapshot, setSnapshot] = useState<AuctionSnapshot>(() => buildInitialSeedSnapshot());
   const [billingProfiles, setBillingProfiles] = useState<BidderBillingProfile[]>([]);
@@ -196,6 +217,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   });
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => loadStoredFavorites());
 
   const setMemoryToken = useCallback((token: string | null) => {
     authTokenRef.current = token;
@@ -303,6 +325,9 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       const ch = new BroadcastChannel('art_for_climate_sync');
       channelRef.current = ch;
       ch.onmessage = (ev) => {
+        if (Array.isArray(ev.data?.favoriteIds)) {
+          setFavoriteIds(ev.data.favoriteIds as string[]);
+        }
         if (!backendAvailableRef.current && ev.data?.snapshot) {
           setSnapshot(ev.data.snapshot as AuctionSnapshot);
           if (ev.data.billingProfiles && authTokenRef.current) {
@@ -314,6 +339,13 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         }
       };
     }
+
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === FAVORITES_STORAGE_KEY) {
+        setFavoriteIds(loadStoredFavorites());
+      }
+    };
+    window.addEventListener('storage', onStorage);
 
     let source: EventSource | null = null;
     let reconnectTimer: number | null = null;
@@ -383,6 +415,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     return () => {
       source?.close();
       channelRef.current?.close();
+      window.removeEventListener('storage', onStorage);
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
       }
@@ -1104,6 +1137,34 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     updateOrganizerSettings,
     resetAuction,
     refreshState,
+    favoriteIds,
+    isFavorite: useCallback(
+      (artworkId: string) => favoriteIds.includes(artworkId),
+      [favoriteIds]
+    ),
+    toggleFavorite: useCallback((artworkId: string) => {
+      setFavoriteIds((prev) => {
+        const next = prev.includes(artworkId)
+          ? prev.filter((id) => id !== artworkId)
+          : [...prev, artworkId];
+        try {
+          window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(next));
+          channelRef.current?.postMessage({ favoriteIds: next });
+        } catch {
+          // Negeer opslagfout
+        }
+        return next;
+      });
+    }, []),
+    clearFavorites: useCallback(() => {
+      setFavoriteIds([]);
+      try {
+        window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
+        channelRef.current?.postMessage({ favoriteIds: [] });
+      } catch {
+        // Negeer opslagfout
+      }
+    }, []),
   };
 
   return <AuctionContext.Provider value={value}>{children}</AuctionContext.Provider>;

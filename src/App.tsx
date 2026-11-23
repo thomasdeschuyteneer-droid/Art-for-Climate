@@ -6,6 +6,7 @@ import { MobileTabBar } from './components/MobileTabBar';
 import { BidderModal } from './components/BidderModal';
 import { HomePage } from './components/HomePage';
 import { ArtworkGallery } from './components/ArtworkGallery';
+import { FavoritesView } from './components/FavoritesView';
 import { ArtworkDetail } from './components/ArtworkDetail';
 import { LiveRoom } from './components/LiveRoom';
 import { FloorplanView } from './components/FloorplanView';
@@ -26,6 +27,7 @@ function parseRouteFromLocation(): AppRoute {
     if (id) return { view: 'artwork', artworkId: id };
   }
   if (pathname === '/kunstwerken' || pathname === '/gallery') return { view: 'gallery' };
+  if (pathname === '/favorieten' || pathname === '/favorites') return { view: 'favorites' };
   if (pathname === '/live') return { view: 'live' };
   if (pathname === '/floorplan' || pathname === '/grondplan') return { view: 'floorplan' };
   if (pathname === '/auctioneer' || pathname === '/veilingmeester') return { view: 'auctioneer' };
@@ -39,6 +41,8 @@ function routeToPath(route: AppRoute): string {
       return '/';
     case 'gallery':
       return '/kunstwerken';
+    case 'favorites':
+      return '/favorieten';
     case 'artwork':
       return `/artwork/${encodeURIComponent(route.artworkId)}`;
     case 'live':
@@ -53,7 +57,8 @@ function routeToPath(route: AppRoute): string {
 }
 
 function AuctionShell() {
-  const { currentBidderNumber, isAdmin, logoutAdmin } = useAuction();
+  const { currentBidderNumber, isAdmin, logoutAdmin, favoriteIds, artworks } = useAuction();
+  const activeFavoritesCount = artworks.filter((a) => favoriteIds.includes(a.id)).length;
   const [route, setRoute] = useState<AppRoute>(() => parseRouteFromLocation());
   const [bidderModalOpen, setBidderModalOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
@@ -92,6 +97,7 @@ function AuctionShell() {
         onOpenBidderModal={() => setBidderModalOpen(true)}
         isAdmin={isAdmin}
         onLogoutAdmin={handleLogoutAdmin}
+        favoritesCount={activeFavoritesCount}
       />
 
       <main className="flex-1">
@@ -102,6 +108,7 @@ function AuctionShell() {
           />
         )}
         {route.view === 'gallery' && <ArtworkGallery onNavigate={navigate} />}
+        {route.view === 'favorites' && <FavoritesView onNavigate={navigate} />}
         {route.view === 'artwork' && (
           <ArtworkDetail
             artworkId={route.artworkId}
@@ -174,6 +181,13 @@ function AuctionShell() {
             </button>
             <button
               type="button"
+              onClick={() => navigate({ view: 'favorites' })}
+              className="hover:text-[#19706D] cursor-pointer"
+            >
+              Favorieten{activeFavoritesCount > 0 ? ` (${activeFavoritesCount})` : ''}
+            </button>
+            <button
+              type="button"
               onClick={() => navigate({ view: 'live' })}
               className="hover:text-[#19706D] cursor-pointer"
             >
@@ -224,7 +238,12 @@ function AuctionShell() {
         </div>
       </footer>
 
-      <MobileTabBar route={route} onNavigate={navigate} isAdmin={isAdmin} />
+      <MobileTabBar
+        route={route}
+        onNavigate={navigate}
+        isAdmin={isAdmin}
+        favoritesCount={activeFavoritesCount}
+      />
       <BidderModal
         open={bidderModalOpen}
         onClose={() => setBidderModalOpen(false)}

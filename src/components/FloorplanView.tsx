@@ -7,6 +7,7 @@ import {
   formatLotNumber,
   getStatusLabel,
 } from '../utils/format';
+import { FavoriteButton } from './FavoriteButton';
 import type { AppRoute } from './HeaderNav';
 
 interface FloorplanViewProps {
@@ -239,21 +240,33 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {visibleArtworks.map((lot) => (
-            <button
+            <div
               key={lot.id}
-              type="button"
               onClick={() => onNavigate({ view: 'artwork', artworkId: lot.id })}
-              className="text-left border border-[#E5E5E5] rounded-2xl p-5 bg-white hover:border-[#19706D] transition-colors cursor-pointer"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onNavigate({ view: 'artwork', artworkId: lot.id });
+                }
+              }}
+              className="text-left border border-[#E5E5E5] rounded-2xl p-5 bg-white hover:border-[#19706D] transition-colors cursor-pointer flex flex-col justify-between"
             >
-              <p className="font-mono text-xs text-[#19706D] font-bold tabular-nums">
-                {formatLotNumber(lot.lotNumber)} · {lot.galleryRoom}
-              </p>
-              <h3 className="font-display text-lg font-bold text-[#363E49] mt-1">
-                {lot.title || lot.artist}
-              </h3>
-              {lot.title && (
-                <p className="text-sm text-[#5D6C7B] mt-0.5">{lot.artist}</p>
-              )}
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-xs text-[#19706D] font-bold tabular-nums">
+                    {formatLotNumber(lot.lotNumber)} · {lot.galleryRoom}
+                  </p>
+                  <FavoriteButton artworkId={lot.id} lotNumber={lot.lotNumber} />
+                </div>
+                <h3 className="font-display text-lg font-bold text-[#363E49] mt-1">
+                  {lot.title || lot.artist}
+                </h3>
+                {lot.title && (
+                  <p className="text-sm text-[#5D6C7B] mt-0.5">{lot.artist}</p>
+                )}
+              </div>
               <div className="mt-4 pt-3 border-t border-[#E5E5E5] flex items-center justify-between text-xs">
                 <span className="text-[#5D6C7B]">{getStatusLabel(lot.status)}</span>
                 <span className="font-mono font-bold text-[#19706D] tabular-nums">
@@ -262,7 +275,7 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
                     : formatEuro(lot.startingBid)}
                 </span>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>

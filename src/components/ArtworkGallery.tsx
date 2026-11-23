@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { QrCode, Search, X } from 'lucide-react';
+import { Heart, QrCode, Search, X } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import type { Artwork } from '../types/auction';
 import {
@@ -9,6 +9,7 @@ import {
   getStatusLabel,
 } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
+import { FavoriteButton } from './FavoriteButton';
 import { QrCodeCard } from './QrCodeCard';
 import type { AppRoute } from './HeaderNav';
 
@@ -17,11 +18,17 @@ interface ArtworkGalleryProps {
 }
 
 export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
-  const { artworks, loading, error } = useAuction();
+  const { artworks, favoriteIds, loading, error } = useAuction();
   const [categoryFilter, setCategoryFilter] = useState<string>('Alle werken');
   const [roomFilter, setRoomFilter] = useState<string>('Alle zalen');
+  const [onlyFavorites, setOnlyFavorites] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [qrArtwork, setQrArtwork] = useState<Artwork | null>(null);
+
+  const favoritesCount = useMemo(
+    () => artworks.filter((lot) => favoriteIds.includes(lot.id)).length,
+    [artworks, favoriteIds]
+  );
 
   const categories = useMemo(() => {
     const set = new Set<string>(['Alle werken']);
@@ -34,6 +41,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
   const filteredArtworks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return artworks.filter((lot) => {
+      if (onlyFavorites && !favoriteIds.includes(lot.id)) return false;
       if (categoryFilter !== 'Alle werken' && lot.category !== categoryFilter) return false;
       if (roomFilter !== 'Alle zalen' && lot.galleryRoom !== roomFilter) return false;
       if (!q) return true;
@@ -45,7 +53,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
         String(lot.lotNumber).includes(q)
       );
     });
-  }, [artworks, categoryFilter, roomFilter, searchQuery]);
+  }, [artworks, categoryFilter, favoriteIds, onlyFavorites, roomFilter, searchQuery]);
 
   if (loading && artworks.length === 0) {
     return (
@@ -110,6 +118,28 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter op zaal in M Leuven">
+          <button
+            type="button"
+            onClick={() => setOnlyFavorites((v) => !v)}
+            aria-pressed={onlyFavorites}
+            className={`min-h-[38px] px-3.5 py-1.5 rounded-[10px] text-xs font-bold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer border ${
+              onlyFavorites
+                ? 'bg-[#923636] border-[#923636] text-white'
+                : 'bg-white border-[#E5E5E5] text-[#363E49] hover:border-[#923636] hover:text-[#923636]'
+            }`}
+          >
+            <Heart
+              className={`w-3.5 h-3.5 ${
+                onlyFavorites
+                  ? 'fill-white text-white'
+                  : favoritesCount > 0
+                    ? 'fill-[#923636] text-[#923636]'
+                    : ''
+              }`}
+              aria-hidden="true"
+            />
+            <span>Favorieten ({favoritesCount})</span>
+          </button>
           {(['Alle zalen', ...M_LEUVEN_ROOMS] as const).map((room) => (
             <button
               key={room}
@@ -149,6 +179,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
               onClick={() => {
                 setCategoryFilter('Alle werken');
                 setRoomFilter('Alle zalen');
+                setOnlyFavorites(false);
                 setSearchQuery('');
               }}
               className="mt-5 min-h-[44px] px-5 py-2 rounded-[12px] text-xs font-bold bg-[#3C7F90] text-white cursor-pointer"
@@ -189,14 +220,17 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
                         <span aria-hidden="true">·</span>
                         <span className="truncate">{artwork.galleryRoom}</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setQrArtwork(artwork)}
-                        aria-label={`Toon QR-code voor Lot ${artwork.lotNumber}`}
-                        className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center text-[#5D6C7B] hover:text-[#19706D] cursor-pointer shrink-0"
-                      >
-                        <QrCode className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <FavoriteButton artworkId={artwork.id} lotNumber={artwork.lotNumber} />
+                        <button
+                          type="button"
+                          onClick={() => setQrArtwork(artwork)}
+                          aria-label={`Toon QR-code voor Lot ${artwork.lotNumber}`}
+                          className="min-h-[36px] min-w-[36px] rounded-[10px] inline-flex items-center justify-center text-[#5D6C7B] hover:text-[#19706D] hover:bg-[#F7F7F7] cursor-pointer shrink-0"
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <button

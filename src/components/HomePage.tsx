@@ -3,6 +3,7 @@ import { ArrowRight, MapPin } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import { formatEuro, formatLotNumber } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
+import { FavoriteButton } from './FavoriteButton';
 import type { AppRoute } from './HeaderNav';
 
 interface HomePageProps {
@@ -197,9 +198,12 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
               </button>
               <div className="p-6 flex-1 flex flex-col justify-between">
                 <div>
-                  <p className="font-mono text-xs text-[#5D6C7B] tabular-nums">
-                    {formatLotNumber(artwork.lotNumber)} · {artwork.galleryRoom}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs text-[#5D6C7B] tabular-nums">
+                      {formatLotNumber(artwork.lotNumber)} · {artwork.galleryRoom}
+                    </p>
+                    <FavoriteButton artworkId={artwork.id} lotNumber={artwork.lotNumber} />
+                  </div>
                   {artwork.title ? (
                     <>
                       <h3 className="font-display text-xl font-bold text-[#363E49] mt-1.5 leading-snug">
