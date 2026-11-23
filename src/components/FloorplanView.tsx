@@ -59,7 +59,7 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
             e.stopPropagation();
             onNavigate({ view: 'artwork', artworkId: lot.id });
           }}
-          title={`${formatLotNumber(lot.lotNumber)} — ${lot.title} (${lot.artist})`}
+          title={`${formatLotNumber(lot.lotNumber)} — ${lot.title ? `${lot.title} (${lot.artist})` : lot.artist}`}
           className="min-h-[34px] px-2.5 py-1 rounded-[8px] bg-white border border-[#E5E5E5] hover:border-[#19706D] hover:bg-[#F0F3E1] font-mono text-xs font-bold text-[#363E49] tabular-nums transition-colors cursor-pointer"
         >
           #{lot.lotNumber}
@@ -249,9 +249,11 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
                 {formatLotNumber(lot.lotNumber)} · {lot.galleryRoom}
               </p>
               <h3 className="font-display text-lg font-bold text-[#363E49] mt-1">
-                {lot.title}
+                {lot.title || lot.artist}
               </h3>
-              <p className="text-sm text-[#5D6C7B] mt-0.5">{lot.artist}</p>
+              {lot.title && (
+                <p className="text-sm text-[#5D6C7B] mt-0.5">{lot.artist}</p>
+              )}
               <div className="mt-4 pt-3 border-t border-[#E5E5E5] flex items-center justify-between text-xs">
                 <span className="text-[#5D6C7B]">{getStatusLabel(lot.status)}</span>
                 <span className="font-mono font-bold text-[#19706D] tabular-nums">

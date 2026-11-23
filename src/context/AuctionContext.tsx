@@ -80,7 +80,7 @@ interface AuctionContextValue {
 const AuctionContext = createContext<AuctionContextValue | null>(null);
 const BIDDER_STORAGE_KEY = 'art_for_climate_bidder_number';
 const ONSITE_STORAGE_KEY = 'art_for_climate_mleuven_onsite';
-const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v12';
+const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v12b';
 const LOCAL_BILLING_KEY = 'art_for_climate_static_billing_v5';
 const LOCAL_SETTINGS_KEY = 'art_for_climate_static_settings_v5';
 const LOCAL_ADMIN_HASH_KEY = 'art_for_climate_static_admin_v5';
@@ -685,7 +685,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
           id: `bid-${Date.now()}`,
           artworkId: artwork.id,
           lotNumber: artwork.lotNumber,
-          artworkTitle: artwork.title,
+          artworkTitle: artwork.title || artwork.artist,
           bidderNumber: targetNumber,
           amount: input.amount,
           source,
@@ -776,7 +776,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
         const artwork: Artwork = {
           id: `lot-${String(lotNumber).padStart(2, '0')}-${Date.now().toString(36)}`,
           lotNumber,
-          title: payload.title || `Lot ${lotNumber}`,
+          title: (payload.title ?? '').trim(),
           artist: payload.artist || 'Kunstenaar',
           artistLocation: payload.artistLocation || 'Leuven / België',
           year: payload.year || '2026',

@@ -127,10 +127,10 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
                     : getStatusLabel(activeLot.status)}
                 </p>
                 <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#363E49] mt-1">
-                  {activeLot.title}
+                  {activeLot.title || activeLot.artist}
                 </h1>
                 <p className="text-sm text-[#5D6C7B] mt-0.5">
-                  {activeLot.artist} · {activeLot.medium}
+                  {activeLot.title ? `${activeLot.artist} · ${activeLot.medium}` : activeLot.medium}
                 </p>
               </div>
               <button
@@ -147,7 +147,7 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
 
             <ArtworkImageFrame
               src={activeLot.imageUrl}
-              alt={activeLot.title}
+              alt={activeLot.title || activeLot.artist}
               className="aspect-[16/11] w-full border-b border-[#E5E5E5]"
               imgClassName="w-full h-full object-contain p-4 sm:p-6"
             />
@@ -340,7 +340,7 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
                           {formatLotNumber(lot.lotNumber)} · {getStatusLabel(lot.status)}
                         </p>
                         <p className="text-sm font-bold text-[#363E49] truncate">
-                          {lot.title}
+                          {lot.title || lot.artist}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

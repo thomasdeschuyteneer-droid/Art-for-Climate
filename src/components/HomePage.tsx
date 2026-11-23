@@ -190,7 +190,7 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
               >
                 <ArtworkImageFrame
                   src={artwork.imageUrl}
-                  alt={`${artwork.title} door ${artwork.artist}`}
+                  alt={artwork.title ? `${artwork.title} door ${artwork.artist}` : artwork.artist}
                   className="w-full h-full"
                   imgClassName="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
                 />
@@ -200,10 +200,18 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                   <p className="font-mono text-xs text-[#5D6C7B] tabular-nums">
                     {formatLotNumber(artwork.lotNumber)} · {artwork.galleryRoom}
                   </p>
-                  <h3 className="font-display text-xl font-bold text-[#363E49] mt-1.5 leading-snug">
-                    {artwork.title}
-                  </h3>
-                  <p className="text-sm text-[#5D6C7B] mt-1">{artwork.artist}</p>
+                  {artwork.title ? (
+                    <>
+                      <h3 className="font-display text-xl font-bold text-[#363E49] mt-1.5 leading-snug">
+                        {artwork.title}
+                      </h3>
+                      <p className="text-sm text-[#5D6C7B] mt-1">{artwork.artist}</p>
+                    </>
+                  ) : (
+                    <h3 className="font-display text-xl font-bold text-[#363E49] mt-1.5 leading-snug">
+                      {artwork.artist}
+                    </h3>
+                  )}
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-[#E5E5E5] flex items-center justify-between gap-4">

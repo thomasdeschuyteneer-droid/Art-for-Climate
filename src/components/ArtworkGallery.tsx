@@ -173,7 +173,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
                 >
                   <ArtworkImageFrame
                     src={artwork.imageUrl}
-                    alt={`${artwork.title} door ${artwork.artist}`}
+                    alt={artwork.title ? `${artwork.title} door ${artwork.artist}` : artwork.artist}
                     className="w-full h-full"
                     imgClassName="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
                   />
@@ -205,12 +205,14 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
                       className="mt-2 block text-left cursor-pointer group"
                     >
                       <h2 className="font-display text-xl font-bold text-[#363E49] group-hover:text-[#19706D] transition-colors leading-snug">
-                        {artwork.title}
+                        {artwork.title || artwork.artist}
                       </h2>
                     </button>
-                    <p className="text-sm font-semibold text-[#5D6C7B] mt-1">
-                      {artwork.artist}
-                    </p>
+                    {artwork.title && (
+                      <p className="text-sm font-semibold text-[#5D6C7B] mt-1">
+                        {artwork.artist}
+                      </p>
+                    )}
                     <p className="text-xs text-[#5D6C7B] mt-1 line-clamp-1">
                       {artwork.medium} · {artwork.dimensions}
                     </p>

@@ -282,10 +282,10 @@ export function AdminPanel() {
       };
       if (editingLot) {
         await updateArtwork(editingLot.id, payload);
-        setMessage(`${formatLotNumber(editingLot.lotNumber)} — ${formState.title} bijgewerkt.`);
+        setMessage(`${formatLotNumber(editingLot.lotNumber)} — ${formState.title || formState.artist} bijgewerkt.`);
       } else {
         const created = await createArtwork(payload);
-        setMessage(`${formatLotNumber(created.lotNumber)} — ${created.title} toegevoegd aan de catalogus.`);
+        setMessage(`${formatLotNumber(created.lotNumber)} — ${created.title || created.artist} toegevoegd aan de catalogus.`);
       }
       setFormOpen(false);
     } catch (err) {
@@ -299,7 +299,7 @@ export function AdminPanel() {
     setMessage(null);
     try {
       await deleteArtwork(lot.id);
-      setMessage(`${formatLotNumber(lot.lotNumber)} (${lot.title}) verwijderd.`);
+      setMessage(`${formatLotNumber(lot.lotNumber)} (${lot.title || lot.artist}) verwijderd.`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Verwijderen mislukt.');
     }
@@ -408,7 +408,7 @@ export function AdminPanel() {
         : undefined;
       return {
         Lotnummer: formatLotNumber(lot.lotNumber),
-        Kunstwerk: lot.title,
+        Kunstwerk: lot.title || lot.artist,
         Kunstenaar: lot.artist,
         Status: lot.status === 'sold' ? 'Verkocht / Toegewezen' : 'Huidig hoogste bod',
         'Koper / Biednummer': lot.highestBidderNumber || '—',
@@ -813,9 +813,9 @@ export function AdminPanel() {
                                           {formatLotNumber(bid.lotNumber)}
                                         </span>
                                         <span className="font-bold text-[#363E49] truncate">
-                                          {bid.artworkTitle}
+                                          {bid.artworkTitle || lot?.artist || ''}
                                         </span>
-                                        {lot && (
+                                        {lot && lot.title && (
                                           <span className="text-xs text-[#5D6C7B] truncate">
                                             ({lot.artist})
                                           </span>
@@ -922,7 +922,7 @@ export function AdminPanel() {
                               <div className="flex items-center gap-3">
                                 <ArtworkImageFrame
                                   src={lot.imageUrl}
-                                  alt={lot.title}
+                                  alt={lot.title || lot.artist}
                                   className="w-14 h-14 shrink-0 rounded-lg border border-[#E5E5E5]"
                                 />
                                 <div className="min-w-0">
@@ -930,11 +930,13 @@ export function AdminPanel() {
                                     {formatLotNumber(lot.lotNumber)}
                                   </p>
                                   <p className="font-bold text-[#363E49] truncate max-w-[230px]">
-                                    {lot.title}
+                                    {lot.title || lot.artist}
                                   </p>
-                                  <p className="text-xs text-[#5D6C7B] truncate max-w-[230px]">
-                                    {lot.artist}
-                                  </p>
+                                  {lot.title && (
+                                    <p className="text-xs text-[#5D6C7B] truncate max-w-[230px]">
+                                      {lot.artist}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -1042,16 +1044,18 @@ export function AdminPanel() {
                       <div className="flex items-center gap-3">
                         <ArtworkImageFrame
                           src={lot.imageUrl}
-                          alt={lot.title}
+                          alt={lot.title || lot.artist}
                           className="w-12 h-12 shrink-0 rounded-lg border border-[#E5E5E5]"
                         />
                         <div className="min-w-0">
                           <p className="font-bold text-[#363E49] truncate max-w-[230px]">
-                            {lot.title}
+                            {lot.title || lot.artist}
                           </p>
-                          <p className="text-xs text-[#5D6C7B] truncate max-w-[230px]">
-                            {lot.artist}
-                          </p>
+                          {lot.title && (
+                            <p className="text-xs text-[#5D6C7B] truncate max-w-[230px]">
+                              {lot.artist}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -1613,11 +1617,10 @@ export function AdminPanel() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#363E49] mb-1">
-                    Titel van het werk
+                    Titel van het werk (optioneel)
                   </label>
                   <input
                     type="text"
-                    required
                     value={formState.title}
                     onChange={(e) => setFormState({ ...formState, title: e.target.value })}
                     className="w-full min-h-[42px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"

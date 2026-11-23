@@ -109,9 +109,11 @@ export function QrCodeCard({ artwork, compact = false }: QrCodeCardProps) {
             {formatLotNumber(artwork.lotNumber)} · {artwork.galleryRoom}
           </p>
           <h4 className="font-display text-lg font-bold text-[#363E49] truncate mt-0.5">
-            {artwork.title}
+            {artwork.title || artwork.artist}
           </h4>
-          <p className="text-xs text-[#5D6C7B] truncate">{artwork.artist}</p>
+          {artwork.title && (
+            <p className="text-xs text-[#5D6C7B] truncate">{artwork.artist}</p>
+          )}
         </div>
         <span className="font-mono text-[11px] font-semibold text-[#5D6C7B] whitespace-nowrap shrink-0">
           M Leuven
@@ -123,7 +125,7 @@ export function QrCodeCard({ artwork, compact = false }: QrCodeCardProps) {
           {dataUrl ? (
             <img
               src={dataUrl}
-              alt={`QR-code voor ${artwork.title}`}
+              alt={`QR-code voor ${artwork.title || artwork.artist}`}
               className={compact ? 'w-28 h-28' : 'w-36 h-36'}
             />
           ) : (

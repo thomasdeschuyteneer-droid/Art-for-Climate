@@ -226,7 +226,7 @@ export function ArtworkDetail({
           <div className="relative border border-[#E5E5E5] rounded-2xl bg-white overflow-hidden">
             <ArtworkImageFrame
               src={artwork.imageUrl}
-              alt={`${artwork.title} door ${artwork.artist}`}
+              alt={artwork.title ? `${artwork.title} door ${artwork.artist}` : artwork.artist}
               className="aspect-[4/5] sm:aspect-square w-full"
               imgClassName="w-full h-full object-contain p-4 sm:p-6"
             />
@@ -261,11 +261,13 @@ export function ArtworkDetail({
             </p>
 
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#19706D] mt-2 leading-tight">
-              {artwork.title}
+              {artwork.title || artwork.artist}
             </h1>
-            <p className="text-lg font-bold text-[#363E49] mt-1.5">
-              {artwork.artist}
-            </p>
+            {artwork.title && (
+              <p className="text-lg font-bold text-[#363E49] mt-1.5">
+                {artwork.artist}
+              </p>
+            )}
             <p className="text-sm sm:text-base text-[#363E49] leading-relaxed mt-4">
               {artwork.description}
             </p>
@@ -577,7 +579,7 @@ export function ArtworkDetail({
           </button>
           <img
             src={artwork.imageUrl}
-            alt={artwork.title}
+            alt={artwork.title || artwork.artist}
             referrerPolicy="no-referrer"
             className="max-h-[90vh] max-w-[92vw] object-contain"
           />

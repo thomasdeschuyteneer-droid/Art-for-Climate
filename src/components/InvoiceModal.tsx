@@ -237,9 +237,9 @@ export function InvoiceModal({
                         {formatLotNumber(lot.lotNumber)}
                       </td>
                       <td className="py-3.5 px-4 align-top">
-                        <p className="font-bold text-[#363E49]">{lot.title}</p>
+                        <p className="font-bold text-[#363E49]">{lot.title || lot.artist}</p>
                         <p className="text-xs text-[#5D6C7B] mt-0.5">
-                          {lot.artist} · {lot.medium} ({lot.dimensions})
+                          {lot.title ? `${lot.artist} · ` : ''}{lot.medium} ({lot.dimensions})
                         </p>
                       </td>
                       <td className="py-3.5 px-4 font-mono text-right tabular-nums align-top">1</td>

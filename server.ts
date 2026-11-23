@@ -34,7 +34,7 @@ function resolveWritableDataDir(): string {
 const DATA_DIR = resolveWritableDataDir();
 const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'auction-db.json');
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -1008,7 +1008,7 @@ async function startServer(): Promise<void> {
       id: `bid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       artworkId: artwork.id,
       lotNumber: artwork.lotNumber,
-      artworkTitle: artwork.title,
+      artworkTitle: artwork.title || artwork.artist,
       bidderNumber: bidder.bidderNumber,
       amount,
       source,
@@ -1034,8 +1034,8 @@ async function startServer(): Promise<void> {
   app.post('/api/artworks', requireAdmin, (req, res) => {
     const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
     const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
-    if (!title || !artist) {
-      res.status(400).json({ error: 'Titel en kunstenaar zijn verplicht.' });
+    if (!artist) {
+      res.status(400).json({ error: 'Naam van de kunstenaar is verplicht.' });
       return;
     }
 
@@ -1126,8 +1126,11 @@ async function startServer(): Promise<void> {
     ];
 
     for (const field of stringFields) {
-      if (typeof req.body?.[field] === 'string' && req.body[field].trim()) {
-        artwork[field] = req.body[field].trim();
+      if (typeof req.body?.[field] === 'string') {
+        const trimmedVal = req.body[field].trim();
+        if (field === 'title' || trimmedVal) {
+          artwork[field] = trimmedVal;
+        }
       }
     }
 
@@ -1221,7 +1224,7 @@ async function startServer(): Promise<void> {
         const built: Artwork = {
           id: lotId,
           lotNumber,
-          title: item.title || `Lot ${lotNumber}`,
+          title: item.title ?? '',
           artist: item.artist || 'Deelnemende kunstenaar',
           artistLocation: 'Leuven / België',
           year: '2026',

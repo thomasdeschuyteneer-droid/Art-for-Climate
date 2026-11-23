@@ -257,7 +257,7 @@ export function AuctioneerDashboard() {
               <div className="flex flex-col sm:flex-row gap-5 items-start border-b border-[#E5E5E5] pb-5">
                 <ArtworkImageFrame
                   src={activeLot.imageUrl}
-                  alt={activeLot.title}
+                  alt={activeLot.title || activeLot.artist}
                   className="w-full sm:w-32 aspect-[4/3] sm:aspect-square shrink-0 rounded-xl border border-[#E5E5E5]"
                 />
                 <div className="flex-1 min-w-0">
@@ -270,9 +270,11 @@ export function AuctioneerDashboard() {
                     </span>
                   </div>
                   <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#363E49] mt-1">
-                    {activeLot.title}
+                    {activeLot.title || activeLot.artist}
                   </h2>
-                  <p className="text-sm text-[#5D6C7B] mt-0.5">{activeLot.artist}</p>
+                  {activeLot.title && (
+                    <p className="text-sm text-[#5D6C7B] mt-0.5">{activeLot.artist}</p>
+                  )}
 
                   <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 border-t border-[#E5E5E5]">
                     <div>
@@ -588,8 +590,10 @@ export function AuctioneerDashboard() {
                         {formatLotNumber(lot.lotNumber)}
                       </td>
                       <td className="py-3.5 px-4">
-                        <p className="font-bold text-[#363E49]">{lot.title}</p>
-                        <p className="text-xs text-[#5D6C7B]">{lot.artist}</p>
+                        <p className="font-bold text-[#363E49]">{lot.title || lot.artist}</p>
+                        {lot.title && (
+                          <p className="text-xs text-[#5D6C7B]">{lot.artist}</p>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-[#363E49] tabular-nums whitespace-nowrap">
                         {lot.currentBid > 0
