@@ -13,10 +13,6 @@ interface HomePageProps {
 export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
   const { artworks, bids, bidders, auctionState, currentBidderNumber } = useAuction();
 
-  const totalRaised = useMemo(() => {
-    return artworks.reduce((sum, lot) => sum + (lot.currentBid > 0 ? lot.currentBid : 0), 0);
-  }, [artworks]);
-
   const highlightedLots = useMemo(() => {
     // Zet bekende werken uit de catalogus en actief lot bovenaan in de selectie
     const preferredOrder = [33, 35, 14, 45, 22, 15];
@@ -134,10 +130,10 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
             </div>
             <div className="py-6 pl-4 lg:px-6">
               <p className="text-xs font-bold uppercase tracking-widest text-[#5D6C7B]">
-                Opbrengst Klimaatfonds
+                Locatie M Leuven
               </p>
-              <p className="font-mono text-2xl font-bold text-[#1E5941] tabular-nums mt-1">
-                {formatEuro(totalRaised)}
+              <p className="font-display text-xl font-bold text-[#1E5941] mt-1">
+                Antichambre &amp; Forum
               </p>
             </div>
             <div className="py-6 pr-4 lg:px-6">

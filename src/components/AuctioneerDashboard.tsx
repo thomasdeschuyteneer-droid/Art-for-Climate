@@ -189,11 +189,6 @@ export function AuctioneerDashboard() {
     }
   };
 
-  const totalHammerValue = useMemo(
-    () => artworks.reduce((sum, a) => sum + (a.currentBid > 0 ? a.currentBid : 0), 0),
-    [artworks]
-  );
-
   const isTimerRunning = Boolean(auctionState?.lotTimerEndsAt && !auctionState?.auctionClosed);
 
   return (
@@ -214,10 +209,10 @@ export function AuctioneerDashboard() {
             <div className="grid grid-cols-3 gap-6">
               <div>
                 <p className="text-[11px] uppercase tracking-widest text-[#5D6C7B]">
-                  Totale opbrengst
+                  Biedingen
                 </p>
                 <p className="font-mono text-xl font-bold text-[#1E5941] tabular-nums mt-0.5">
-                  {formatEuro(totalHammerValue)}
+                  {bids.length}
                 </p>
               </div>
               <div>

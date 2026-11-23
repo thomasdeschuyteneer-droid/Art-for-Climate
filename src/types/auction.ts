@@ -2,6 +2,8 @@ export type LotStatus = 'upcoming' | 'live' | 'sold' | 'passed';
 
 export type HammerStage = 'open' | 'going_once' | 'going_twice' | 'hammer_down';
 
+export type InvoiceVatMode = 'exempt_charity' | 'vat_6' | 'vat_21';
+
 export interface Artwork {
   id: string;
   lotNumber: number;
@@ -41,10 +43,38 @@ export interface Bid {
   createdAt: string;
 }
 
+// Publieke samenvatting — bevat nooit namen, e-mailadressen of btw-nummers
 export interface BidderSummary {
   bidderNumber: string;
   city: string;
   registeredAt: string;
+}
+
+// Vertrouwelijk facturatieprofiel — uitsluitend voor facturatie & beheer
+export interface BidderBillingProfile {
+  bidderNumber: string;
+  name: string;
+  companyName: string;
+  vatNumber: string;
+  email: string;
+  street: string;
+  postalCode: string;
+  city: string;
+  country: string;
+  registeredAt: string;
+}
+
+export interface InvoiceOrganizerSettings {
+  legalName: string;
+  addressLine: string;
+  postalCity: string;
+  country: string;
+  vatNumber: string;
+  courtDistrict: string;
+  iban: string;
+  bic: string;
+  email: string;
+  vatMode: InvoiceVatMode;
 }
 
 export interface AuctionState {

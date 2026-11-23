@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Download,
   Edit3,
+  FileText,
   FileUp,
   ImagePlus,
   Plus,
@@ -12,7 +13,12 @@ import {
   X,
 } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
-import type { Artwork, LotStatus } from '../types/auction';
+import type {
+  Artwork,
+  BidderBillingProfile,
+  InvoiceVatMode,
+  LotStatus,
+} from '../types/auction';
 import {
   M_LEUVEN_ROOMS,
   formatEuro,
@@ -22,8 +28,9 @@ import {
 } from '../utils/format';
 import { QrCodeCard } from './QrCodeCard';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
+import { InvoiceModal } from './InvoiceModal';
 
-type AdminTab = 'inventory' | 'import' | 'qrcodes' | 'ledger';
+type AdminTab = 'inventory' | 'billing' | 'import' | 'qrcodes' | 'ledger';
 
 const EMPTY_FORM = {
   title: '',
@@ -59,6 +66,8 @@ export function AdminPanel() {
     artworks,
     bids,
     bidders,
+    billingProfiles,
+    organizerSettings,
     auctionState,
     createArtwork,
     updateArtwork,
@@ -66,6 +75,9 @@ export function AdminPanel() {
     importCatalogPdf,
     uploadFloorplan,
     uploadArtworkImage,
+    fetchBillingData,
+    updateBillingProfile,
+    updateOrganizerSettings,
     resetAuction,
   } = useAuction();
 
@@ -79,6 +91,49 @@ export function AdminPanel() {
   const [replaceOnImport, setReplaceOnImport] = useState(true);
   const [pdfPreviewText, setPdfPreviewText] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [invoiceTarget, setInvoiceTarget] = useState<{
+    bidder: BidderBillingProfile;
+    lots: Artwork[];
+    index: number;
+  } | null>(null);
+  const [editingBilling, setEditingBilling] = useState<BidderBillingProfile | null>(null);
+  const [settingsForm, setSettingsForm] = useState(organizerSettings);
+
+  useEffect(() => {
+    void fetchBillingData();
+  }, [fetchBillingData]);
+
+  useEffect(() => {
+    setSettingsForm(organizerSettings);
+  }, [organizerSettings]);
+
+  const billingByBidderNumber = useMemo(() => {
+    const map = new Map<string, BidderBillingProfile>();
+    for (const p of billingProfiles) {
+      map.set(p.bidderNumber, p);
+    }
+    return map;
+  }, [billingProfiles]);
+
+  const wonLotsByBidder = useMemo(() => {
+    const map = new Map<string, Artwork[]>();
+    for (const lot of artworks) {
+      if (lot.currentBid > 0 && lot.highestBidderNumber) {
+        const list = map.get(lot.highestBidderNumber) ?? [];
+        list.push(lot);
+        map.set(lot.highestBidderNumber, list);
+      }
+    }
+    return map;
+  }, [artworks]);
+
+  const allKnownBidderNumbers = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of bidders) set.add(b.bidderNumber);
+    for (const p of billingProfiles) set.add(p.bidderNumber);
+    for (const num of wonLotsByBidder.keys()) set.add(num);
+    return Array.from(set).sort();
+  }, [bidders, billingProfiles, wonLotsByBidder]);
 
   const openCreateModal = () => {
     setEditingLot(null);
@@ -224,6 +279,25 @@ export function AdminPanel() {
       Kanaal: b.source === 'floor' ? 'Zaal M Leuven' : 'QR-sokkel M Leuven',
     }));
 
+    const billingRows = allKnownBidderNumbers.map((num) => {
+      const profile = billingByBidderNumber.get(num);
+      const won = wonLotsByBidder.get(num) ?? [];
+      const total = won.reduce((sum, l) => sum + l.currentBid, 0);
+      return {
+        Biednummer: num,
+        'Bedrijfsnaam / Organisatie': profile?.companyName || '—',
+        Contactpersoon: profile?.name || '—',
+        'BTW-nummer': profile?.vatNumber || 'Nog aan te vullen',
+        'E-mailadres': profile?.email || '—',
+        Adres: profile?.street || '—',
+        Postcode: profile?.postalCode || '—',
+        Gemeente: profile?.city || '—',
+        Land: profile?.country || 'België',
+        'Toegewezen loten': won.map((l) => formatLotNumber(l.lotNumber)).join(', ') || '—',
+        'Te factureren totaal (EUR)': total,
+      };
+    });
+
     const wb = XLSX.utils.book_new();
     const wsArtworks = XLSX.utils.json_to_sheet(artworkRows);
     const wsBids = XLSX.utils.json_to_sheet(
@@ -231,16 +305,52 @@ export function AdminPanel() {
         ? bidRows
         : [{ Melding: 'Nog geen biedingen geregistreerd.' }]
     );
+    const wsBilling = XLSX.utils.json_to_sheet(
+      billingRows.length > 0
+        ? billingRows
+        : [{ Melding: 'Nog geen bieders ingeschreven.' }]
+    );
 
     XLSX.utils.book_append_sheet(wb, wsArtworks, 'Kunstwerken');
     XLSX.utils.book_append_sheet(wb, wsBids, 'Biedgeschiedenis');
+    XLSX.utils.book_append_sheet(wb, wsBilling, 'Facturatiegegevens');
     XLSX.writeFile(wb, 'Art_for_Climate_Leuven2030_Veiling.xlsx');
-    setMessage('Excel-bestand (Art_for_Climate_Leuven2030_Veiling.xlsx) gedownload.');
+    setMessage('Excel-bestand (Art_for_Climate_Leuven2030_Veiling.xlsx) inclusief btw- en facturatiegegevens gedownload.');
+  };
+
+  const handleSaveOrganizerSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      await updateOrganizerSettings(settingsForm);
+      setMessage('Factuurgegevens van Leuven 2030 vzw bewaard.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Opslaan mislukt.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveBillingProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBilling) return;
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      await updateBillingProfile(editingBilling.bidderNumber, editingBilling);
+      setMessage(`Facturatiegegevens en btw-nummer voor bieder ${editingBilling.bidderNumber} bijgewerkt.`);
+      setEditingBilling(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Bijwerken mislukt.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="pb-24 md:pb-16">
-      <section className="bg-white border-b border-[#E5E5E5] no-print">
+      <section className="bg-white border-b border-[#E5E5E5] no-print invoice-hidden-when-printing">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <p className="text-xs uppercase tracking-widest text-[#19706D] font-bold">
@@ -286,6 +396,7 @@ export function AdminPanel() {
           {(
             [
               { id: 'inventory', label: `Kunstwerken (${artworks.length})` },
+              { id: 'billing', label: `Facturatie & BTW (${allKnownBidderNumbers.length})` },
               { id: 'import', label: 'Catalogus PDF & Grondplan' },
               { id: 'qrcodes', label: `QR-bordjes (${artworks.length})` },
               { id: 'ledger', label: `Biedgeschiedenis (${bids.length})` },
@@ -294,7 +405,10 @@ export function AdminPanel() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id === 'billing') void fetchBillingData();
+              }}
               className={`min-h-[48px] py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === tab.id
                   ? 'border-[#19706D] text-[#19706D]'
@@ -307,7 +421,7 @@ export function AdminPanel() {
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 invoice-hidden-when-printing">
         {message && (
           <div className="mb-6 p-4 rounded-xl border border-[#B4C232]/60 bg-[#F0F3E1] text-xs font-bold text-[#1E5941] flex items-center justify-between gap-4 no-print">
             <span>{message}</span>
@@ -403,7 +517,243 @@ export function AdminPanel() {
           </div>
         )}
 
-        {/* TAB 2: CATALOGUS PDF & GRONDPLAN IMPORT */}
+        {/* TAB 2: FACTURATIE & BTW-NUMMERS */}
+        {activeTab === 'billing' && (
+          <div className="space-y-8">
+            <div className="border border-[#E5E5E5] rounded-2xl bg-white overflow-hidden">
+              <div className="p-5 sm:p-6 border-b border-[#E5E5E5] flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-display text-2xl font-bold text-[#19706D]">
+                    Facturatie per bieder (met btw-nummer)
+                  </h2>
+                  <p className="text-xs text-[#5D6C7B] mt-0.5">
+                    Enkel zichtbaar in Beheer. Maak rechtstreeks een legale Belgische factuur op voor bieders met toegewezen werken.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="min-h-[40px] px-4 py-2 rounded-[10px] bg-[#1E5941] text-white hover:bg-[#19706D] text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Exporteer facturatielijst (.xlsx)</span>
+                </button>
+              </div>
+
+              {allKnownBidderNumbers.length === 0 ? (
+                <p className="p-8 text-sm text-[#5D6C7B] text-center">
+                  Er zijn nog geen bieders ingeschreven met facturatiegegevens.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-[#E5E5E5] bg-[#F7F7F7] text-xs uppercase tracking-wider text-[#5D6C7B]">
+                        <th className="py-3 px-4 font-bold">Biednr.</th>
+                        <th className="py-3 px-4 font-bold">Bedrijf / Contactpersoon</th>
+                        <th className="py-3 px-4 font-bold">BTW-nummer</th>
+                        <th className="py-3 px-4 font-bold">Factuuradres</th>
+                        <th className="py-3 px-4 font-bold">Gewonnen loten</th>
+                        <th className="py-3 px-4 font-bold">Totaal</th>
+                        <th className="py-3 px-4 font-bold text-right">Factuur</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5E5E5]">
+                      {allKnownBidderNumbers.map((num, idx) => {
+                        const profile: BidderBillingProfile = billingByBidderNumber.get(num) ?? {
+                          bidderNumber: num,
+                          name: `Zaalbieder ${num}`,
+                          companyName: '',
+                          vatNumber: '',
+                          email: '',
+                          street: '',
+                          postalCode: '3000',
+                          city: 'Leuven',
+                          country: 'België',
+                          registeredAt: new Date().toISOString(),
+                        };
+                        const wonLots = wonLotsByBidder.get(num) ?? [];
+                        const totalDue = wonLots.reduce((sum, l) => sum + l.currentBid, 0);
+
+                        return (
+                          <tr key={num} className="hover:bg-[#F7F7F7]">
+                            <td className="py-3.5 px-4 font-mono text-xs font-bold text-[#1E5941] tabular-nums whitespace-nowrap">
+                              {num}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <p className="font-bold text-[#363E49]">
+                                {profile.companyName || profile.name}
+                              </p>
+                              <p className="text-xs text-[#5D6C7B]">
+                                {profile.companyName ? `${profile.name} · ` : ''}
+                                {profile.email || 'Geen e-mail'}
+                              </p>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-xs font-bold text-[#363E49] tabular-nums whitespace-nowrap">
+                              {profile.vatNumber ? (
+                                profile.vatNumber
+                              ) : (
+                                <span className="text-[#923636]">Ontbreekt</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-xs text-[#5D6C7B]">
+                              {profile.street ? (
+                                <>
+                                  {profile.street}, {profile.postalCode} {profile.city}
+                                </>
+                              ) : (
+                                'Nog aan te vullen'
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-xs text-[#19706D] tabular-nums">
+                              {wonLots.length > 0
+                                ? wonLots.map((l) => formatLotNumber(l.lotNumber)).join(', ')
+                                : '—'}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono font-bold text-[#363E49] tabular-nums whitespace-nowrap">
+                              {totalDue > 0 ? formatEuro(totalDue) : '—'}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingBilling(profile)}
+                                  className="min-h-[36px] px-3 py-1.5 rounded-[8px] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] hover:border-[#19706D] cursor-pointer"
+                                >
+                                  Gegevens
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={wonLots.length === 0}
+                                  onClick={() =>
+                                    setInvoiceTarget({
+                                      bidder: profile,
+                                      lots: wonLots,
+                                      index: idx + 1,
+                                    })
+                                  }
+                                  className="min-h-[36px] px-3 py-1.5 rounded-[8px] bg-[#19706D] hover:bg-[#1E5941] text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
+                                >
+                                  <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>Factuur</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Instellingen organisator (Leuven 2030 vzw) voor op de factuur */}
+            <form
+              onSubmit={handleSaveOrganizerSettings}
+              className="border border-[#E5E5E5] rounded-2xl bg-white p-6 space-y-5"
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#19706D]">
+                  Wettelijke afzendergegevens op facturen
+                </p>
+                <h3 className="font-display text-xl font-bold text-[#363E49] mt-1">
+                  Factuurgegevens Leuven 2030 vzw
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Statutaire benaming
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.legalName}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, legalName: e.target.value })}
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Ondernemingsnummer / BTW-nummer
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.vatNumber}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, vatNumber: e.target.value })}
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs font-mono border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Belgisch btw-stelsel
+                  </label>
+                  <select
+                    value={settingsForm.vatMode}
+                    onChange={(e) =>
+                      setSettingsForm({
+                        ...settingsForm,
+                        vatMode: e.target.value as InvoiceVatMode,
+                      })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs border border-[#E5E5E5] bg-white"
+                  >
+                    <option value="exempt_charity">Vrijgesteld (art. 44 §2, 12° W.BTW — vzw)</option>
+                    <option value="vat_6">6% btw (kunstvoorwerpen KB nr. 20)</option>
+                    <option value="vat_21">21% btw (standaardtarief)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Maatschappelijke zetel (straat + nr.)
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.addressLine}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, addressLine: e.target.value })}
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Postcode en gemeente
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.postalCity}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, postalCity: e.target.value })}
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    IBAN-rekeningnummer voor betaling
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.iban}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, iban: e.target.value })}
+                    placeholder="bv. BE68 0000 0000 0000"
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-xs font-mono border border-[#E5E5E5]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="min-h-[42px] px-5 py-2 rounded-[10px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-xs font-bold cursor-pointer"
+                >
+                  Factuurgegevens opslaan
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 3: CATALOGUS PDF & GRONDPLAN IMPORT */}
         {activeTab === 'import' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="border border-[#E5E5E5] rounded-2xl bg-white p-6 space-y-5">
@@ -786,6 +1136,185 @@ export function AdminPanel() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Facturatiegegevens aanvullen/bewerken */}
+      {editingBilling && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#363E49]/40 backdrop-blur-xs p-0 sm:p-4 no-print"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Facturatiegegevens bieder ${editingBilling.bidderNumber}`}
+        >
+          <div className="w-full sm:max-w-lg bg-white border border-[#E5E5E5] rounded-t-2xl sm:rounded-2xl p-6 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-4">
+              <h2 className="font-display text-xl font-bold text-[#19706D]">
+                Facturatiegegevens bieder {editingBilling.bidderNumber}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditingBilling(null)}
+                aria-label="Sluit venster"
+                className="min-h-[40px] min-w-[40px] flex items-center justify-center text-[#5D6C7B] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBillingProfile} className="mt-5 space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Bedrijfsnaam / Organisatie
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.companyName}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, companyName: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    BTW-nummer
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.vatNumber}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, vatNumber: e.target.value })
+                    }
+                    placeholder="BE 0544.963.123"
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm font-mono border border-[#E5E5E5]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Contactpersoon
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.name}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, name: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    E-mailadres
+                  </label>
+                  <input
+                    type="email"
+                    value={editingBilling.email}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, email: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#363E49] mb-1">
+                  Straat en huisnummer
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingBilling.street}
+                  onChange={(e) =>
+                    setEditingBilling({ ...editingBilling, street: e.target.value })
+                  }
+                  className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Postcode
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.postalCode}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, postalCode: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm font-mono border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Gemeente
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.city}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, city: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#363E49] mb-1">
+                    Land
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingBilling.country}
+                    onChange={(e) =>
+                      setEditingBilling({ ...editingBilling, country: e.target.value })
+                    }
+                    className="w-full min-h-[40px] px-3 py-2 rounded-[10px] text-sm border border-[#E5E5E5]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#E5E5E5]">
+                <button
+                  type="button"
+                  onClick={() => setEditingBilling(null)}
+                  className="min-h-[42px] px-4 py-2 rounded-[10px] border border-[#E5E5E5] text-xs font-bold cursor-pointer"
+                >
+                  Annuleren
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="min-h-[42px] px-5 py-2 rounded-[10px] bg-[#19706D] text-white text-xs font-bold cursor-pointer"
+                >
+                  Bewaren
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Officiële Belgische Factuur */}
+      {invoiceTarget && (
+        <InvoiceModal
+          open={Boolean(invoiceTarget)}
+          onClose={() => setInvoiceTarget(null)}
+          bidder={invoiceTarget.bidder}
+          wonArtworks={invoiceTarget.lots}
+          organizerSettings={organizerSettings}
+          defaultInvoiceNumber={`AFC-2026-${String(invoiceTarget.index).padStart(3, '0')}`}
+        />
       )}
     </div>
   );

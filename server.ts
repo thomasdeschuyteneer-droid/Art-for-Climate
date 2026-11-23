@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
@@ -10,12 +11,29 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
-const DATA_DIR = path.resolve(__dirname, 'data');
-const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
+const REPO_DATA_DIR = path.resolve(__dirname, 'data');
 const PUBLIC_DIR = path.resolve(__dirname, 'public');
-const OFFICIAL_CATALOG_FILE = path.resolve(DATA_DIR, 'official-catalog.json');
+const SRC_CATALOG_FILE = path.resolve(__dirname, 'src', 'data', 'official-catalog.json');
+const DATA_CATALOG_FILE = path.resolve(REPO_DATA_DIR, 'official-catalog.json');
+
+function resolveWritableDataDir(): string {
+  try {
+    fs.mkdirSync(REPO_DATA_DIR, { recursive: true });
+    const probe = path.join(REPO_DATA_DIR, `.write-test-${process.pid}`);
+    fs.writeFileSync(probe, 'ok');
+    fs.unlinkSync(probe);
+    return REPO_DATA_DIR;
+  } catch {
+    const tmpDir = path.join(os.tmpdir(), 'art-for-climate-data');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    return tmpDir;
+  }
+}
+
+const DATA_DIR = resolveWritableDataDir();
+const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
 const DB_FILE = path.resolve(DATA_DIR, 'auction-db.json');
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 type LotStatus = 'upcoming' | 'live' | 'sold' | 'passed';
 type HammerStage = 'open' | 'going_once' | 'going_twice' | 'hammer_down';
@@ -75,11 +93,18 @@ interface Bid {
   createdAt: string;
 }
 
+type InvoiceVatMode = 'exempt_charity' | 'vat_6' | 'vat_21';
+
 interface BidderRecord {
   bidderNumber: string;
   name: string;
+  companyName: string;
+  vatNumber: string;
   email: string;
+  street: string;
+  postalCode: string;
   city: string;
+  country: string;
   registeredAt: string;
 }
 
@@ -87,6 +112,19 @@ interface BidderSummary {
   bidderNumber: string;
   city: string;
   registeredAt: string;
+}
+
+interface InvoiceOrganizerSettings {
+  legalName: string;
+  addressLine: string;
+  postalCity: string;
+  country: string;
+  vatNumber: string;
+  courtDistrict: string;
+  iban: string;
+  bic: string;
+  email: string;
+  vatMode: InvoiceVatMode;
 }
 
 interface AuctionState {
@@ -114,20 +152,25 @@ interface AuctionDB {
   artworks: Artwork[];
   bids: Bid[];
   bidders: BidderRecord[];
+  organizerSettings: InvoiceOrganizerSettings;
   auctionState: AuctionState;
 }
 
 function loadOfficialCatalogSeed(): OfficialCatalogItem[] {
-  try {
-    if (!fs.existsSync(OFFICIAL_CATALOG_FILE)) {
-      return [];
+  const candidates = [SRC_CATALOG_FILE, DATA_CATALOG_FILE];
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) continue;
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } catch {
+      // Probeer volgende locatie
     }
-    const raw = fs.readFileSync(OFFICIAL_CATALOG_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
   }
+  return [];
 }
 
 function createInitialSeed(): AuctionDB {
@@ -196,6 +239,18 @@ function createInitialSeed(): AuctionDB {
     artworks,
     bids: [],
     bidders: [],
+    organizerSettings: {
+      legalName: 'Leuven Klimaatneutraal 2030 vzw (Leuven 2030)',
+      addressLine: 'Professor Van Overstraetenplein 1',
+      postalCity: '3000 Leuven',
+      country: 'België',
+      vatNumber: 'BE 0544.963.123',
+      courtDistrict: 'RPR Leuven',
+      iban: '',
+      bic: '',
+      email: 'info@leuven2030.be',
+      vatMode: 'exempt_charity',
+    },
     auctionState,
   };
 }
@@ -275,6 +330,23 @@ function normalizeBidderInput(raw: string): string | null {
   const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 9999) return null;
   return formatBidderNumber(parsed);
+}
+
+function normalizeVatNumber(raw: string): string | null {
+  const compact = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[\s.\-/]+/g, '');
+  if (!compact) return null;
+  const withPrefix = /^[01]\d{9}$/.test(compact) ? `BE${compact}` : compact;
+  if (/^BE[01]\d{9}$/.test(withPrefix)) {
+    const digits = withPrefix.slice(2);
+    return `BE ${digits.slice(0, 4)}.${digits.slice(4, 7)}.${digits.slice(7, 10)}`;
+  }
+  if (/^(AT|BG|CY|CZ|DE|DK|EE|EL|ES|FI|FR|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK|XI)[A-Z0-9]{8,12}$/.test(withPrefix)) {
+    return `${withPrefix.slice(0, 2)} ${withPrefix.slice(2)}`;
+  }
+  return null;
 }
 
 function getEffectiveRemainingSeconds(state: AuctionState): number {
@@ -418,27 +490,68 @@ async function startServer(): Promise<void> {
 
   app.post('/api/bidders', (req, res) => {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const companyName = typeof req.body?.companyName === 'string' ? req.body.companyName.trim() : '';
+    const rawVat = typeof req.body?.vatNumber === 'string' ? req.body.vatNumber.trim() : '';
     const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const street = typeof req.body?.street === 'string' ? req.body.street.trim() : '';
+    const postalCode = typeof req.body?.postalCode === 'string' ? req.body.postalCode.trim() : '';
     const city = typeof req.body?.city === 'string' ? req.body.city.trim() : 'Leuven';
+    const country = typeof req.body?.country === 'string' ? req.body.country.trim() : 'België';
 
     if (!name || name.length < 2) {
-      res.status(400).json({ error: 'Vul je volledige naam in om een biedernummer te ontvangen.' });
+      res.status(400).json({ error: 'Vul je volledige naam in om een biednummer te ontvangen.' });
       return;
     }
 
-    if (email) {
-      const existing = db.bidders.find((b) => b.email.toLowerCase() === email.toLowerCase());
-      if (existing) {
-        res.json({
-          bidder: {
-            bidderNumber: existing.bidderNumber,
-            city: existing.city,
-            registeredAt: existing.registeredAt,
-          },
-          existing: true,
-        });
-        return;
-      }
+    if (!companyName || companyName.length < 2) {
+      res.status(400).json({ error: 'Vul de bedrijfsnaam of tenaamstelling voor de factuur in.' });
+      return;
+    }
+
+    const normalizedVat = normalizeVatNumber(rawVat);
+    if (!normalizedVat) {
+      res.status(400).json({
+        error: 'Vul een geldig btw-nummer in voor facturatie (bijvoorbeeld BE 0544.963.123).',
+      });
+      return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Vul een geldig e-mailadres in voor het verzenden van de factuur.' });
+      return;
+    }
+
+    if (!street || street.length < 3 || !postalCode || !city) {
+      res.status(400).json({
+        error: 'Vul een volledig factuuradres (straat + nummer, postcode en gemeente) in.',
+      });
+      return;
+    }
+
+    const existing = db.bidders.find(
+      (b) =>
+        (b.email && b.email.toLowerCase() === email.toLowerCase()) ||
+        (b.vatNumber && b.vatNumber === normalizedVat)
+    );
+    if (existing) {
+      existing.name = name.slice(0, 80);
+      existing.companyName = companyName.slice(0, 120);
+      existing.vatNumber = normalizedVat;
+      existing.email = email.slice(0, 120);
+      existing.street = street.slice(0, 140);
+      existing.postalCode = postalCode.slice(0, 20);
+      existing.city = city.slice(0, 60);
+      existing.country = (country || 'België').slice(0, 60);
+      persistDB();
+      res.json({
+        bidder: {
+          bidderNumber: existing.bidderNumber,
+          city: existing.city,
+          registeredAt: existing.registeredAt,
+        },
+        existing: true,
+      });
+      return;
     }
 
     const maxNum = db.bidders.reduce((max, b) => {
@@ -449,8 +562,13 @@ async function startServer(): Promise<void> {
     const bidder: BidderRecord = {
       bidderNumber: formatBidderNumber(maxNum + 1),
       name: name.slice(0, 80),
+      companyName: companyName.slice(0, 120),
+      vatNumber: normalizedVat,
       email: email.slice(0, 120),
-      city: (city || 'Leuven').slice(0, 60),
+      street: street.slice(0, 140),
+      postalCode: postalCode.slice(0, 20),
+      city: city.slice(0, 60),
+      country: (country || 'België').slice(0, 60),
       registeredAt: new Date().toISOString(),
     };
 
@@ -465,6 +583,102 @@ async function startServer(): Promise<void> {
       },
       existing: false,
     });
+  });
+
+  // Vertrouwelijke facturatie-eindpunten uitsluitend voor het beheerpaneel
+  app.get('/api/admin/billing', (_req, res) => {
+    res.json({
+      bidders: db.bidders,
+      organizerSettings: db.organizerSettings,
+    });
+  });
+
+  app.patch('/api/admin/bidders/:bidderNumber', (req, res) => {
+    const normalizedNum = normalizeBidderInput(req.params.bidderNumber);
+    if (!normalizedNum) {
+      res.status(400).json({ error: 'Ongeldig biednummer.' });
+      return;
+    }
+    const bidder = db.bidders.find((b) => b.bidderNumber === normalizedNum);
+    if (!bidder) {
+      res.status(404).json({ error: 'Bieder niet gevonden.' });
+      return;
+    }
+
+    if (typeof req.body?.name === 'string' && req.body.name.trim()) {
+      bidder.name = req.body.name.trim().slice(0, 80);
+    }
+    if (typeof req.body?.companyName === 'string') {
+      bidder.companyName = req.body.companyName.trim().slice(0, 120);
+    }
+    if (typeof req.body?.vatNumber === 'string' && req.body.vatNumber.trim()) {
+      const normalizedVat = normalizeVatNumber(req.body.vatNumber);
+      if (!normalizedVat) {
+        res.status(400).json({ error: 'Ongeldig btw-nummer (bv. BE 0544.963.123).' });
+        return;
+      }
+      bidder.vatNumber = normalizedVat;
+    }
+    if (typeof req.body?.email === 'string') {
+      bidder.email = req.body.email.trim().slice(0, 120);
+    }
+    if (typeof req.body?.street === 'string') {
+      bidder.street = req.body.street.trim().slice(0, 140);
+    }
+    if (typeof req.body?.postalCode === 'string') {
+      bidder.postalCode = req.body.postalCode.trim().slice(0, 20);
+    }
+    if (typeof req.body?.city === 'string' && req.body.city.trim()) {
+      bidder.city = req.body.city.trim().slice(0, 60);
+    }
+    if (typeof req.body?.country === 'string' && req.body.country.trim()) {
+      bidder.country = req.body.country.trim().slice(0, 60);
+    }
+
+    persistDB();
+    broadcastState('bidder_updated');
+    res.json({ bidder });
+  });
+
+  app.patch('/api/admin/invoice-settings', (req, res) => {
+    const s = db.organizerSettings;
+    if (typeof req.body?.legalName === 'string' && req.body.legalName.trim()) {
+      s.legalName = req.body.legalName.trim().slice(0, 140);
+    }
+    if (typeof req.body?.addressLine === 'string' && req.body.addressLine.trim()) {
+      s.addressLine = req.body.addressLine.trim().slice(0, 140);
+    }
+    if (typeof req.body?.postalCity === 'string' && req.body.postalCity.trim()) {
+      s.postalCity = req.body.postalCity.trim().slice(0, 80);
+    }
+    if (typeof req.body?.country === 'string' && req.body.country.trim()) {
+      s.country = req.body.country.trim().slice(0, 60);
+    }
+    if (typeof req.body?.vatNumber === 'string' && req.body.vatNumber.trim()) {
+      s.vatNumber = req.body.vatNumber.trim().slice(0, 40);
+    }
+    if (typeof req.body?.courtDistrict === 'string') {
+      s.courtDistrict = req.body.courtDistrict.trim().slice(0, 60);
+    }
+    if (typeof req.body?.iban === 'string') {
+      s.iban = req.body.iban.trim().toUpperCase().slice(0, 40);
+    }
+    if (typeof req.body?.bic === 'string') {
+      s.bic = req.body.bic.trim().toUpperCase().slice(0, 20);
+    }
+    if (typeof req.body?.email === 'string') {
+      s.email = req.body.email.trim().slice(0, 120);
+    }
+    if (
+      req.body?.vatMode === 'exempt_charity' ||
+      req.body?.vatMode === 'vat_6' ||
+      req.body?.vatMode === 'vat_21'
+    ) {
+      s.vatMode = req.body.vatMode;
+    }
+
+    persistDB();
+    res.json({ organizerSettings: s });
   });
 
   app.post('/api/bids', (req, res) => {
@@ -515,8 +729,13 @@ async function startServer(): Promise<void> {
       bidder = {
         bidderNumber: normalizedNumber,
         name: `Zaalbieder ${normalizedNumber}`,
+        companyName: '',
+        vatNumber: '',
         email: '',
+        street: '',
+        postalCode: '3000',
         city: 'Leuven',
+        country: 'België',
         registeredAt: new Date().toISOString(),
       };
       db.bidders.push(bidder);

@@ -57,4 +57,25 @@
   .print-break-inside-avoid {
     break-inside: avoid;
   }
+  body.printing-invoice {
+    background: #FFFFFF !important;
+  }
+  body.printing-invoice .invoice-hidden-when-printing {
+    display: none !important;
+  }
+  body.printing-invoice #invoice-print-wrapper {
+    position: static !important;
+    inset: auto !important;
+    background: #FFFFFF !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  body.printing-invoice #invoice-print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
 }
