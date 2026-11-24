@@ -44,7 +44,7 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
       </p>
 
       {!isConfigured && (
-        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed space-y-1.5">
+        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed space-y-2">
           {serverReachable ? (
             <>
               <p>
@@ -52,19 +52,26 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
                 <span className="font-mono">ADMIN_PASSWORD</span> ontbreken in de omgevingsvariabelen van deze omgeving.
               </p>
               <p className="font-normal text-[#363E49]">
-                Werk je in de gedeelde link? Controleer in AI Studio bij <strong>Secrets</strong> of deze variabelen aanwezig zijn en publiceer/deel opnieuw, of open de ontwikkel-URL.
+                Controleer in AI Studio bij <strong>Secrets</strong> of beide variabelen ingesteld zijn en herlaad de pagina.
               </p>
             </>
           ) : (
             <>
               <p>
-                Geen actieve backend-server bereikbaar op deze URL (statische hosting).
+                Je bekijkt momenteel de statische voorbeeldversie zonder actieve Node-server.
               </p>
               <p className="font-normal text-[#363E49]">
-                Beheerderstoegang werkt enkel wanneer de Node-server draait met{' '}
-                <span className="font-mono">ADMIN_USERNAME</span> en{' '}
-                <span className="font-mono">ADMIN_PASSWORD</span>.
+                Op een gedeelde statische link (<span className="font-mono">ais-pre-…</span> of Vercel) draait er geen backend-server voor beheerderstoegang. Open de actieve{' '}
+                <strong>ontwikkel-URL</strong> (<span className="font-mono">ais-dev-…</span>) of deploy de volledige Node-server via <strong>Deploy</strong> in AI Studio zodat{' '}
+                <span className="font-mono">ADMIN_USERNAME</span> en <span className="font-mono">ADMIN_PASSWORD</span> actief zijn.
               </p>
+              <button
+                type="button"
+                onClick={() => void refreshAuthStatus()}
+                className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white border border-[#923636]/30 text-[11px] font-bold text-[#923636] hover:bg-[#F7F7F7] cursor-pointer"
+              >
+                Verbinding opnieuw controleren
+              </button>
             </>
           )}
         </div>

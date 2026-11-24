@@ -564,6 +564,7 @@ function parseCatalogPagesToLots(pages: string[]): Array<Partial<Artwork>> {
 
 async function startServer(): Promise<void> {
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '30mb' }));
   app.use('/uploads', express.static(UPLOADS_DIR));
   if (fs.existsSync(PUBLIC_DIR)) {
@@ -1484,6 +1485,10 @@ async function startServer(): Promise<void> {
     persistDB();
     broadcastState('auction_reset');
     res.json(getPublicSnapshot());
+  });
+
+  app.all('/api/*', (_req, res) => {
+    res.status(404).json({ error: 'API-route niet gevonden.' });
   });
 
   if (process.env.NODE_ENV !== 'production') {

@@ -238,22 +238,38 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshAuthStatus = useCallback(async (): Promise<AdminAuthStatus> => {
-    try {
+    const attemptFetch = async (): Promise<AdminAuthStatus> => {
       const headers: Record<string, string> = {};
       if (authTokenRef.current) {
         headers.Authorization = `Bearer ${authTokenRef.current}`;
       }
       const res = await fetch('/api/auth/status', { headers, cache: 'no-store' });
       const ct = res.headers.get('content-type') || '';
+      if ((res.status === 502 || res.status === 503 || res.status === 504) && !ct.includes('application/json')) {
+        throw new Error('RETRYABLE_GATEWAY');
+      }
       if (!res.ok || !ct.includes('application/json')) {
         throw new Error('NO_BACKEND');
       }
       const data = (await res.json()) as AdminAuthStatus;
-      const nextStatus: AdminAuthStatus = { ...data, serverReachable: true };
+      return { ...data, serverReachable: true };
+    };
+
+    try {
+      let nextStatus: AdminAuthStatus;
+      try {
+        nextStatus = await attemptFetch();
+      } catch (err) {
+        if (err instanceof Error && err.message === 'NO_BACKEND') {
+          throw err;
+        }
+        await new Promise((r) => window.setTimeout(r, 700));
+        nextStatus = await attemptFetch();
+      }
       backendAvailableRef.current = true;
       setBackendAvailable(true);
       setAuthStatus(nextStatus);
-      if (!data.authenticated && authTokenRef.current) {
+      if (!nextStatus.authenticated && authTokenRef.current) {
         setMemoryToken(null);
       }
       return nextStatus;
@@ -424,23 +440,45 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const loginAdmin = useCallback(
     async (username: string, password: string) => {
       const cleanUser = username.trim();
-      let res: Response;
-      try {
-        res = await fetch('/api/auth/login', {
+      const postLogin = () =>
+        fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
           body: JSON.stringify({ username: cleanUser, password }),
         });
+
+      let res: Response;
+      try {
+        res = await postLogin();
+        const firstCt = res.headers.get('content-type') || '';
+        if (
+          (res.status === 502 || res.status === 503 || res.status === 504) &&
+          !firstCt.includes('application/json')
+        ) {
+          await new Promise((r) => window.setTimeout(r, 700));
+          res = await postLogin();
+        }
       } catch {
-        throw new Error(
-          'Kan geen verbinding maken met de server. Herlaad de pagina en probeer opnieuw.'
-        );
+        try {
+          await new Promise((r) => window.setTimeout(r, 700));
+          res = await postLogin();
+        } catch {
+          throw new Error(
+            'Kan geen verbinding maken met de server. Herlaad de pagina en probeer opnieuw.'
+          );
+        }
       }
 
       const ct = res.headers.get('content-type') || '';
       if (!ct.includes('application/json')) {
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          throw new Error(
+            'De server is nog aan het opstarten. Wacht enkele seconden en probeer opnieuw.'
+          );
+        }
         throw new Error(
-          'Op deze URL draait enkel statische hosting zonder Node-server. Open de app via de actieve server-URL (waar ADMIN_USERNAME en ADMIN_PASSWORD zijn ingesteld).'
+          'Je bevindt je op de statische voorbeeld-URL zonder actieve Node-server. Open de actieve ontwikkel- of Cloud Run-server-URL (waar ADMIN_USERNAME en ADMIN_PASSWORD in Secrets staan) om als beheerder aan te melden.'
         );
       }
 
