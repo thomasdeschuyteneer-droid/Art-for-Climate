@@ -190,9 +190,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
         </div>
       ) : (
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredArtworks.map((artwork) => {
-            const hasBid = artwork.currentBid > 0;
-            return (
+          {filteredArtworks.map((artwork) => (
               <article
                 key={artwork.id}
                 className="flex flex-col border border-[#E5E5E5] rounded-2xl bg-white overflow-hidden transition-colors hover:border-[#19706D]"
@@ -256,28 +254,20 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
                     <div className="flex items-baseline justify-between gap-3">
                       <div>
                         <p className="text-[11px] uppercase tracking-wider text-[#5D6C7B]">
-                          {hasBid ? 'Huidig bod' : 'Startbod'}
+                          Startprijs
                         </p>
                         <p className="font-mono text-xl font-bold text-[#363E49] tabular-nums mt-0.5">
-                          {hasBid
-                            ? formatEuro(artwork.currentBid)
-                            : formatEuro(artwork.startingBid)}
+                          {formatEuro(artwork.startingBid)}
                         </p>
                       </div>
 
                       <div className="text-right">
                         <p className="text-[11px] uppercase tracking-wider text-[#5D6C7B]">
-                          {hasBid ? 'Hoogste bieder' : 'Status'}
+                          Status
                         </p>
-                        {hasBid && artwork.highestBidderNumber ? (
-                          <p className="font-mono text-sm font-bold text-[#1E5941] tabular-nums mt-0.5">
-                            {artwork.highestBidderNumber}
-                          </p>
-                        ) : (
-                          <p className="text-xs font-semibold text-[#19706D] mt-1">
-                            {getStatusLabel(artwork.status)}
-                          </p>
-                        )}
+                        <p className="text-xs font-semibold text-[#19706D] mt-1">
+                          {getStatusLabel(artwork.status)}
+                        </p>
                       </div>
                     </div>
 
@@ -291,8 +281,7 @@ export function ArtworkGallery({ onNavigate }: ArtworkGalleryProps) {
                   </div>
                 </div>
               </article>
-            );
-          })}
+          ))}
         </div>
       )}
 

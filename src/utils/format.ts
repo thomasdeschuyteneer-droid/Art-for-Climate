@@ -102,7 +102,7 @@ export function formatRelativeTime(iso: string): string {
 export function getStatusLabel(status: LotStatus): string {
   switch (status) {
     case 'live':
-      return 'Open voor biedingen';
+      return 'In zaalveiling';
     case 'upcoming':
       return 'Binnenkort';
     case 'sold':

@@ -87,7 +87,7 @@ export function buildInitialSeedSnapshot(): AuctionSnapshot {
     lotTimerEndsAt: null,
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
-      'Welkom in M Leuven. Bieden gebeurt uitsluitend ter plekke met jouw persoonlijk biedernummer ten voordele van het Leuvens Klimaatfonds.',
+      'Welkom in M Leuven. Ontdek alle kunstwerken, bewaar je favorieten en bied live in de zaal op 16 december ten voordele van het Leuvens Klimaatfonds.',
     catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
     publicBaseUrl:

@@ -13,8 +13,6 @@ export type AppRoute =
 interface HeaderNavProps {
   route: AppRoute;
   onNavigate: (next: AppRoute) => void;
-  bidderNumber: string | null;
-  onOpenBidderModal: () => void;
   isAdmin: boolean;
   onLogoutAdmin: () => void;
   favoritesCount: number;
@@ -23,8 +21,6 @@ interface HeaderNavProps {
 export function HeaderNav({
   route,
   onNavigate,
-  bidderNumber,
-  onOpenBidderModal,
   isAdmin,
   onLogoutAdmin,
   favoritesCount,
@@ -106,18 +102,14 @@ export function HeaderNav({
           })}
         </nav>
 
-        {/* Zone 3: Primaire actieknop & optioneel beheerdersafmelding */}
+        {/* Zone 3: Collectie bekijken & optioneel beheerdersafmelding */}
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
-            onClick={onOpenBidderModal}
-            className={`min-h-[42px] px-5 py-2 text-sm font-bold rounded-[12px] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#19706D] ${
-              bidderNumber
-                ? 'bg-[#F0F3E1] text-[#1E5941] border border-[#B4C232]/60 hover:bg-[#DEE9EC]'
-                : 'bg-[#3C7F90] text-white hover:bg-[#19706D]'
-            }`}
+            onClick={() => onNavigate({ view: 'gallery' })}
+            className="min-h-[42px] px-5 py-2 text-sm font-bold rounded-[12px] bg-[#3C7F90] text-white hover:bg-[#19706D] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#19706D]"
           >
-            {bidderNumber ? `Bieder ${bidderNumber}` : 'Inloggen / Inschrijven'}
+            Bekijk collectie
           </button>
 
           {isAdmin && (

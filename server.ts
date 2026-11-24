@@ -240,7 +240,7 @@ function createInitialSeed(): AuctionDB {
     lotTimerEndsAt: null,
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
-      'Welkom in M Leuven. Bieden gebeurt uitsluitend ter plekke met jouw persoonlijk biedernummer ten voordele van het Leuvens Klimaatfonds.',
+      'Welkom in M Leuven. Ontdek alle kunstwerken, bewaar je favorieten en bied live in de zaal op 16 december ten voordele van het Leuvens Klimaatfonds.',
     catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
     publicBaseUrl:
@@ -926,12 +926,18 @@ async function startServer(): Promise<void> {
     const amount = Number(req.body?.amount);
     const isAdminCaller = verifyAdminFromRequest(req) !== null;
     const requestedFloor = req.body?.source === 'floor';
-    if (requestedFloor && !isAdminCaller) {
+    if (!requestedFloor) {
+      res.status(403).json({
+        error: 'Online bieden via de website is uitgeschakeld. Bieden gebeurt uitsluitend live in de zaal in M Leuven.',
+      });
+      return;
+    }
+    if (!isAdminCaller) {
       res.status(401).json({ error: 'Enkel de veilingmeester kan zaalbiedingen rechtstreeks ingeven.' });
       return;
     }
-    const source: 'qr' | 'floor' = requestedFloor && isAdminCaller ? 'floor' : 'qr';
-    const onSiteVerified = Boolean(req.body?.onSiteVerified) || source === 'floor';
+    const source: 'qr' | 'floor' = 'floor';
+    const onSiteVerified = true;
 
     if (db.auctionState.auctionClosed) {
       res.status(409).json({

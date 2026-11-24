@@ -3,7 +3,6 @@ import { Lock } from 'lucide-react';
 import { AuctionProvider, useAuction } from './context/AuctionContext';
 import { HeaderNav, type AppRoute } from './components/HeaderNav';
 import { MobileTabBar } from './components/MobileTabBar';
-import { BidderModal } from './components/BidderModal';
 import { HomePage } from './components/HomePage';
 import { ArtworkGallery } from './components/ArtworkGallery';
 import { FavoritesView } from './components/FavoritesView';
@@ -57,10 +56,9 @@ function routeToPath(route: AppRoute): string {
 }
 
 function AuctionShell() {
-  const { currentBidderNumber, isAdmin, logoutAdmin, favoriteIds, artworks } = useAuction();
+  const { isAdmin, logoutAdmin, favoriteIds, artworks } = useAuction();
   const activeFavoritesCount = artworks.filter((a) => favoriteIds.includes(a.id)).length;
   const [route, setRoute] = useState<AppRoute>(() => parseRouteFromLocation());
-  const [bidderModalOpen, setBidderModalOpen] = useState(false);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
 
   useEffect(() => {
@@ -93,40 +91,19 @@ function AuctionShell() {
       <HeaderNav
         route={route}
         onNavigate={navigate}
-        bidderNumber={currentBidderNumber}
-        onOpenBidderModal={() => setBidderModalOpen(true)}
         isAdmin={isAdmin}
         onLogoutAdmin={handleLogoutAdmin}
         favoritesCount={activeFavoritesCount}
       />
 
       <main className="flex-1">
-        {route.view === 'home' && (
-          <HomePage
-            onNavigate={navigate}
-            onOpenBidderModal={() => setBidderModalOpen(true)}
-          />
-        )}
+        {route.view === 'home' && <HomePage onNavigate={navigate} />}
         {route.view === 'gallery' && <ArtworkGallery onNavigate={navigate} />}
-        {route.view === 'favorites' && (
-          <FavoritesView
-            onNavigate={navigate}
-            onOpenBidderModal={() => setBidderModalOpen(true)}
-          />
-        )}
+        {route.view === 'favorites' && <FavoritesView onNavigate={navigate} />}
         {route.view === 'artwork' && (
-          <ArtworkDetail
-            artworkId={route.artworkId}
-            onNavigate={navigate}
-            onOpenBidderModal={() => setBidderModalOpen(true)}
-          />
+          <ArtworkDetail artworkId={route.artworkId} onNavigate={navigate} />
         )}
-        {route.view === 'live' && (
-          <LiveRoom
-            onNavigate={navigate}
-            onOpenBidderModal={() => setBidderModalOpen(true)}
-          />
-        )}
+        {route.view === 'live' && <LiveRoom onNavigate={navigate} />}
         {route.view === 'floorplan' && <FloorplanView onNavigate={navigate} />}
         {route.view === 'auctioneer' &&
           (isAdmin ? (
@@ -248,14 +225,6 @@ function AuctionShell() {
         onNavigate={navigate}
         isAdmin={isAdmin}
         favoritesCount={activeFavoritesCount}
-      />
-      <BidderModal
-        open={bidderModalOpen}
-        onClose={() => setBidderModalOpen(false)}
-        onNavigateFavorites={() => {
-          setBidderModalOpen(false);
-          navigate({ view: 'favorites' });
-        }}
       />
       <AdminLoginModal
         open={adminLoginOpen}

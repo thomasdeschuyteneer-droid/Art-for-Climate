@@ -662,20 +662,16 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       source?: 'qr' | 'floor';
     }) => {
       const source = input.source ?? 'qr';
-      if (source !== 'floor' && !currentBidderNumber) {
-        throw new Error('Log eerst in met jouw biednummer om een bod uit te brengen.');
+      if (source !== 'floor') {
+        throw new Error(
+          'Online bieden via de website is uitgeschakeld. Bieden gebeurt uitsluitend live in de zaal in M Leuven.'
+        );
       }
 
-      const rawTarget = source === 'floor' ? (input.bidderNumber ?? '') : (currentBidderNumber ?? '');
+      const rawTarget = input.bidderNumber ?? '';
       const targetNumber = normalizeBidderNumber(rawTarget);
       if (!targetNumber) {
         throw new Error('Biednummer is verplicht om een bod uit te brengen (bv. #027).');
-      }
-
-      if (source !== 'floor' && !onSiteVerifiedState) {
-        throw new Error(
-          'Bieden kan enkel ter plekke in M Leuven. Bevestig eerst je aanwezigheid in de zaal.'
-        );
       }
 
       if (!backendAvailableRef.current) {

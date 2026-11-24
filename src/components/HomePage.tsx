@@ -8,11 +8,10 @@ import type { AppRoute } from './HeaderNav';
 
 interface HomePageProps {
   onNavigate: (next: AppRoute) => void;
-  onOpenBidderModal: () => void;
 }
 
-export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
-  const { artworks, bids, bidders, auctionState, currentBidderNumber } = useAuction();
+export function HomePage({ onNavigate }: HomePageProps) {
+  const { artworks, auctionState } = useAuction();
 
   const highlightedLots = useMemo(() => {
     // Zet bekende werken uit de catalogus en actief lot bovenaan in de selectie
@@ -56,7 +55,7 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                   Een unieke kunstveiling ten voordele van de klimaattransitie in Leuven.
                 </p>
                 <p className="mt-3 text-sm sm:text-base text-[#5D6C7B] max-w-2xl leading-relaxed">
-                  Op 16 december brengen we {artworks.length} kunstwerken en artistieke ervaringen samen in M Leuven. Bieden gebeurt uitsluitend ter plekke in de zaal ten voordele van het Leuvens Klimaatfonds.
+                  Op 16 december brengen we {artworks.length} kunstwerken en artistieke ervaringen samen in M Leuven. Bieden gebeurt uitsluitend live in de zaal ten voordele van het Leuvens Klimaatfonds — online bieden via deze website is niet mogelijk.
                 </p>
               </div>
 
@@ -71,10 +70,10 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={onOpenBidderModal}
+                  onClick={() => onNavigate({ view: 'favorites' })}
                   className="min-h-[48px] px-7 py-3 rounded-[12px] border border-[#19706D] text-[#19706D] hover:bg-[#DEE9EC] text-sm font-bold inline-flex items-center transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  {currentBidderNumber ? `Bieder ${currentBidderNumber}` : 'Schrijf je in'}
+                  Mijn favorieten
                 </button>
                 <button
                   type="button"
@@ -139,18 +138,18 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
             </div>
             <div className="py-6 pr-4 lg:px-6">
               <p className="text-xs font-bold uppercase tracking-widest text-[#5D6C7B]">
-                Ingeschreven bieders
+                Veilingdatum
               </p>
-              <p className="font-mono text-2xl font-bold text-[#363E49] tabular-nums mt-1">
-                {bidders.length}
+              <p className="font-mono text-xl font-bold text-[#363E49] tabular-nums mt-1">
+                16 dec 2026 · 16:00
               </p>
             </div>
             <div className="py-6 pl-4 lg:pl-6">
               <p className="text-xs font-bold uppercase tracking-widest text-[#5D6C7B]">
-                Uitgebrachte biedingen
+                Goede doel
               </p>
-              <p className="font-mono text-2xl font-bold text-[#363E49] tabular-nums mt-1">
-                {bids.length}
+              <p className="font-display text-xl font-bold text-[#363E49] mt-1">
+                Leuvens Klimaatfonds
               </p>
             </div>
           </div>
@@ -221,12 +220,10 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                 <div className="mt-5 pt-4 border-t border-[#E5E5E5] flex items-center justify-between gap-4">
                   <div>
                     <p className="text-[11px] uppercase tracking-wider text-[#5D6C7B]">
-                      {artwork.currentBid > 0 ? 'Huidig bod' : 'Startbod'}
+                      Startprijs
                     </p>
                     <p className="font-mono text-lg font-bold text-[#19706D] tabular-nums">
-                      {artwork.currentBid > 0
-                        ? formatEuro(artwork.currentBid)
-                        : formatEuro(artwork.startingBid)}
+                      {formatEuro(artwork.startingBid)}
                     </p>
                   </div>
                   <button
@@ -263,12 +260,12 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
           <div className="lg:col-span-5 bg-[#F0F3E1] rounded-xl p-6 flex flex-col justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-[#1E5941]">
-                Spelregels ter plekke
+                Spelregels in M Leuven
               </p>
               <ul className="mt-3 space-y-2.5 text-sm text-[#363E49]">
-                <li>1. Ontvang bij aankomst jouw bordje met biednummer (#027) en schrijf je daarmee in.</li>
-                <li>2. Scan de QR-code bij een werk in Antichambre of Forum, of bied via de zaalveiling.</li>
-                <li>3. Elk nieuw bod moet strikt hoger zijn dan het huidige hoogste bod.</li>
+                <li>1. Bekijk alle kunstwerken in de catalogus of scan de QR-code bij een werk in Antichambre of Forum.</li>
+                <li>2. Tik op het hartje om je favoriete werken bij te houden voor de veiling.</li>
+                <li>3. Bieden gebeurt uitsluitend live in de zaal op 16 december — online bieden is niet mogelijk.</li>
               </ul>
             </div>
             <button

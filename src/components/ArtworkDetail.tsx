@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Heart,
-  Lock,
+  Info,
   Maximize2,
   X,
 } from 'lucide-react';
@@ -12,11 +12,7 @@ import { useAuction } from '../context/AuctionContext';
 import {
   formatEuro,
   formatLotNumber,
-  formatRelativeTime,
-  formatTimeShort,
   getStatusLabel,
-  getSuggestedMinimumBid,
-  normalizeBidderNumber,
 } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { CountdownClock } from './CountdownClock';
@@ -27,22 +23,15 @@ import type { AppRoute } from './HeaderNav';
 interface ArtworkDetailProps {
   artworkId: string;
   onNavigate: (next: AppRoute) => void;
-  onOpenBidderModal: () => void;
 }
 
 export function ArtworkDetail({
   artworkId,
   onNavigate,
-  onOpenBidderModal,
 }: ArtworkDetailProps) {
   const {
     artworks,
-    bids,
     auctionState,
-    currentBidderNumber,
-    onSiteVerified,
-    setOnSiteVerified,
-    placeBid,
     favoriteIds,
     isFavorite,
     loading,
@@ -62,36 +51,6 @@ export function ArtworkDetail({
     artworkIndex >= 0 && artworkIndex < artworks.length - 1
       ? artworks[artworkIndex + 1]
       : null;
-
-  const lotBids = useMemo(
-    () => (artwork ? bids.filter((b) => b.artworkId === artwork.id) : []),
-    [bids, artwork]
-  );
-
-  const suggestedMinimum = artwork
-    ? getSuggestedMinimumBid(artwork.currentBid, artwork.startingBid, artwork.bidCount)
-    : 0;
-
-  const [bidInput, setBidInput] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (artwork) {
-      setBidInput(
-        String(
-          getSuggestedMinimumBid(
-            artwork.currentBid,
-            artwork.startingBid,
-            artwork.bidCount
-          )
-        )
-      );
-    }
-  }, [artwork?.id, artwork?.currentBid, artwork?.bidCount, artwork?.startingBid]);
 
   if (!artwork && loading) {
     return (
@@ -123,72 +82,6 @@ export function ArtworkDetail({
     );
   }
 
-  const isLeadingBidder =
-    Boolean(currentBidderNumber) &&
-    artwork.highestBidderNumber === currentBidderNumber;
-  const isAuctionOpen =
-    artwork.status === 'live' && !auctionState?.auctionClosed;
-
-  const handleSubmitBid = async (amountToBid: number) => {
-    setFeedback(null);
-    const activeNumber = currentBidderNumber ? normalizeBidderNumber(currentBidderNumber) : null;
-    if (!activeNumber) {
-      onOpenBidderModal();
-      return;
-    }
-
-    if (!Number.isFinite(amountToBid) || !Number.isInteger(amountToBid)) {
-      setFeedback({
-        type: 'error',
-        message: 'Geef een geldig geheel bedrag in euro in.',
-      });
-      return;
-    }
-
-    if (amountToBid <= artwork.currentBid) {
-      setFeedback({
-        type: 'error',
-        message: `Je bod moet strikt hoger zijn dan het huidige hoogste bod van ${formatEuro(artwork.currentBid)}.`,
-      });
-      return;
-    }
-
-    if (artwork.bidCount === 0 && amountToBid < artwork.startingBid) {
-      setFeedback({
-        type: 'error',
-        message: `Het openingsbod bedraagt minstens ${formatEuro(artwork.startingBid)}.`,
-      });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await placeBid({
-        artworkId: artwork.id,
-        bidderNumber: activeNumber,
-        amount: amountToBid,
-      });
-      setFeedback({
-        type: 'success',
-        message: `Bod van ${formatEuro(amountToBid)} geregistreerd voor bieder ${activeNumber}.`,
-      });
-    } catch (err) {
-      setFeedback({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Bod kon niet worden verwerkt.',
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void handleSubmitBid(Number(bidInput));
-  };
-
-  const baseForQuickIncrements =
-    artwork.currentBid > 0 ? artwork.currentBid : artwork.startingBid;
   const isSpotlightLot = auctionState?.activeLotId === artwork.id;
 
   return (
@@ -258,7 +151,7 @@ export function ArtworkDetail({
           <QrCodeCard artwork={artwork} compact />
         </div>
 
-        {/* Rechterkolom: Kunstwerkgegevens & Biedformulier */}
+        {/* Rechterkolom: Kunstwerkgegevens & Startprijs */}
         <div className="lg:col-span-6 space-y-6">
           <div>
             <p className="font-mono text-xs uppercase tracking-widest text-[#5D6C7B] tabular-nums">
@@ -326,40 +219,32 @@ export function ArtworkDetail({
               </dd>
             </div>
             <div className="py-3.5 grid grid-cols-3 gap-4">
-              <dt className="text-[#5D6C7B] font-semibold">Startbod</dt>
+              <dt className="text-[#5D6C7B] font-semibold">Startprijs</dt>
               <dd className="col-span-2 font-mono text-xs font-bold text-[#363E49] tabular-nums self-center">
                 {formatEuro(artwork.startingBid)}
               </dd>
             </div>
           </dl>
 
-          {/* Huidig hoogste bod & Aftelklok */}
+          {/* Startprijs & Status in de zaal */}
           <div className="bg-[#DEE9EC]/60 border border-[#DEE9EC] rounded-2xl p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-end">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#5D6C7B]">
-                  {artwork.currentBid > 0 ? 'Huidig hoogste bod' : 'Openingsbod (minimum)'}
+                  Startprijs
                 </p>
                 <p className="font-mono text-3xl sm:text-4xl font-bold text-[#19706D] tabular-nums mt-1">
-                  {artwork.currentBid > 0
-                    ? formatEuro(artwork.currentBid)
-                    : formatEuro(artwork.startingBid)}
+                  {formatEuro(artwork.startingBid)}
                 </p>
               </div>
 
               <div className="sm:text-right">
                 <p className="text-xs font-bold uppercase tracking-widest text-[#5D6C7B]">
-                  Hoogste bieder
+                  Status · Zaal
                 </p>
-                {artwork.highestBidderNumber ? (
-                  <p className="font-mono text-2xl font-bold text-[#1E5941] tabular-nums mt-1">
-                    {artwork.highestBidderNumber}
-                  </p>
-                ) : (
-                  <p className="font-mono text-sm text-[#5D6C7B] mt-2">
-                    Nog geen biedingen
-                  </p>
-                )}
+                <p className="text-base font-bold text-[#1E5941] mt-1">
+                  {getStatusLabel(artwork.status)} · {artwork.galleryRoom}
+                </p>
               </div>
             </div>
 
@@ -371,252 +256,29 @@ export function ArtworkDetail({
                 <CountdownClock auctionState={auctionState} compact />
               </div>
             )}
-
-            {isLeadingBidder && currentBidderNumber && (
-              <p className="text-xs font-bold text-[#1E5941]">
-                Jouw biednummer {currentBidderNumber} staat momenteel bovenaan.
-              </p>
-            )}
           </div>
 
-          {/* Biedformulier: enkel toegankelijk wanneer ingelogd met biednummer */}
-          {isAuctionOpen ? (
-            <div className="border border-[#E5E5E5] rounded-2xl p-5 sm:p-6 bg-white space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-xl font-bold text-[#19706D]">
-                    Bod uitbrengen
-                  </h2>
-                  <p className="text-xs text-[#5D6C7B] mt-0.5">
-                    Enkel ter plekke in M Leuven · Minimaal:{' '}
-                    <span className="font-mono font-bold text-[#363E49] tabular-nums">
-                      {formatEuro(
-                        artwork.bidCount > 0
-                          ? artwork.currentBid + 1
-                          : artwork.startingBid
-                      )}
-                    </span>
-                  </p>
-                </div>
-
-                {currentBidderNumber && (
-                  <button
-                    type="button"
-                    onClick={onOpenBidderModal}
-                    className="min-h-[36px] px-3.5 py-1.5 rounded-[10px] text-xs font-bold bg-[#F0F3E1] text-[#1E5941] border border-[#B4C232]/50 hover:bg-[#DEE9EC] cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    Wijzig biednummer
-                  </button>
-                )}
+          {/* Informatiepaneel: Enkel live bieden in de zaal */}
+          <div className="border border-[#E5E5E5] rounded-2xl p-5 sm:p-6 bg-white space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[#DEE9EC] text-[#19706D] flex items-center justify-center shrink-0">
+                <Info className="w-4 h-4" aria-hidden="true" />
               </div>
-
-              {!currentBidderNumber ? (
-                <div className="p-5 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-[#DEE9EC] text-[#19706D] flex items-center justify-center shrink-0">
-                      <Lock className="w-4 h-4" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#363E49]">
-                        Log eerst in om een bod uit te brengen
-                      </p>
-                      <p className="text-xs text-[#5D6C7B] mt-1 leading-relaxed">
-                        Enkel ingelogde bieders met een geldig biednummer kunnen meebieden. Nog geen nummer? Schrijf je in binnen 30 seconden (btw-nummer is niet verplicht).
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onOpenBidderModal}
-                    className="w-full min-h-[46px] px-5 py-2.5 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold transition-colors cursor-pointer"
-                  >
-                    Inloggen / Inschrijven met biednummer
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <label className="flex items-center gap-3 p-3.5 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={onSiteVerified}
-                      onChange={(e) => setOnSiteVerified(e.target.checked)}
-                      className="w-4 h-4 accent-[#19706D] shrink-0"
-                    />
-                    <span>
-                      Ik ben ter plekke aanwezig in M Leuven om deel te nemen aan de veiling.
-                    </span>
-                  </label>
-
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {[50, 100, 250].map((inc) => {
-                      const targetAmount =
-                        artwork.currentBid > 0
-                          ? baseForQuickIncrements + inc
-                          : artwork.startingBid + (inc === 50 ? 0 : inc);
-                      return (
-                        <button
-                          key={inc}
-                          type="button"
-                          disabled={submitting}
-                          onClick={() => {
-                            setBidInput(String(targetAmount));
-                            void handleSubmitBid(targetAmount);
-                          }}
-                          className="min-h-[48px] px-2 py-2 rounded-[12px] border border-[#E5E5E5] hover:border-[#19706D] hover:bg-[#F0F3E1] text-center transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                          <span className="block text-[11px] text-[#5D6C7B]">
-                            {artwork.currentBid > 0
-                              ? `+€ ${inc}`
-                              : inc === 50
-                                ? 'Startbod'
-                                : `+€ ${inc}`}
-                          </span>
-                          <span className="block font-mono text-sm font-bold text-[#363E49] tabular-nums">
-                            {formatEuro(targetAmount)}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label
-                          htmlFor="bidder-number-input"
-                          className="block text-xs font-bold text-[#363E49] mb-1.5"
-                        >
-                          Biednummer *
-                        </label>
-                        <input
-                          id="bidder-number-input"
-                          type="text"
-                          required
-                          readOnly
-                          value={currentBidderNumber}
-                          className="w-full min-h-[48px] px-3.5 py-2 rounded-[12px] font-mono text-base font-bold border border-[#B4C232]/60 bg-[#F0F3E1] text-[#1E5941] tabular-nums focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="bid-amount-input"
-                          className="block text-xs font-bold text-[#363E49] mb-1.5"
-                        >
-                          Bedrag (€) *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-[#5D6C7B]">
-                            €
-                          </span>
-                          <input
-                            id="bid-amount-input"
-                            type="number"
-                            required
-                            min={
-                              artwork.bidCount > 0
-                                ? artwork.currentBid + 1
-                                : artwork.startingBid
-                            }
-                            step={1}
-                            value={bidInput}
-                            onChange={(e) => setBidInput(e.target.value)}
-                            className="w-full min-h-[48px] pl-8 pr-4 py-2 rounded-[12px] font-mono text-base font-bold border border-[#E5E5E5] bg-white text-[#363E49] tabular-nums focus:outline-none focus:border-[#19706D]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full min-h-[48px] px-7 py-3 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold tracking-wide transition-colors disabled:opacity-60 cursor-pointer"
-                    >
-                      {submitting ? 'Bod wordt verwerkt...' : 'Bod uitbrengen'}
-                    </button>
-                  </form>
-                </>
-              )}
-
-              {feedback && (
-                <div
-                  role="status"
-                  className={`p-3.5 rounded-xl text-xs font-semibold border ${
-                    feedback.type === 'success'
-                      ? 'bg-[#F0F3E1] border-[#B4C232]/60 text-[#1E5941]'
-                      : 'bg-[#923636]/10 border-[#923636]/30 text-[#923636]'
-                  }`}
-                >
-                  {feedback.message}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="border border-[#E5E5E5] rounded-2xl bg-white p-5">
-              <p className="text-sm font-semibold text-[#363E49]">
-                {auctionState?.auctionClosed
-                  ? 'De veiling werd afgesloten door de veilingmeester.'
-                  : artwork.status === 'sold'
-                    ? `Lot ${artwork.lotNumber} werd toegewezen aan bieder ${artwork.highestBidderNumber ?? '—'} voor ${formatEuro(artwork.currentBid)}.`
-                    : artwork.status === 'upcoming'
-                      ? `Biedingen openen zodra de veilingmeester dit werk oproept (startbod ${formatEuro(suggestedMinimum)}).`
-                      : `Lot ${artwork.lotNumber} werd afgesloten.`}
-              </p>
-            </div>
-          )}
-
-          {/* Biedgeschiedenis — enkel biednummers, geen namen */}
-          <div className="bg-white border border-[#E5E5E5] rounded-2xl p-5 sm:p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E5E5E5]">
-              <h2 className="text-xs uppercase tracking-widest font-bold text-[#5D6C7B]">
-                Biedgeschiedenis
-              </h2>
-              <span className="font-mono text-xs text-[#5D6C7B] tabular-nums">
-                {lotBids.length} {lotBids.length === 1 ? 'bod' : 'biedingen'}
-              </span>
-            </div>
-
-            {lotBids.length === 0 ? (
-              <p className="text-sm text-[#5D6C7B] py-6">
-                Er werd nog geen bod uitgebracht op dit kunstwerk.
-              </p>
-            ) : (
-              <div className="divide-y divide-[#E5E5E5]">
-                {lotBids.map((bid, idx) => (
-                  <div
-                    key={bid.id}
-                    className="py-3 flex items-center justify-between gap-4 text-sm"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={`font-mono font-bold tabular-nums ${
-                          idx === 0 ? 'text-[#1E5941]' : 'text-[#363E49]'
-                        }`}
-                      >
-                        {bid.bidderNumber}
-                      </span>
-                      <span className="text-xs text-[#5D6C7B] truncate">
-                        {bid.source === 'floor' ? 'Zaalbod M Leuven' : 'Ter plekke via QR'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <span className="font-mono text-xs text-[#5D6C7B] tabular-nums hidden sm:inline">
-                        {formatTimeShort(bid.createdAt)}
-                      </span>
-                      <span className="font-mono text-xs text-[#5D6C7B] tabular-nums sm:hidden">
-                        {formatRelativeTime(bid.createdAt)}
-                      </span>
-                      <span
-                        className={`font-mono font-bold tabular-nums ${
-                          idx === 0 ? 'text-[#1E5941]' : 'text-[#363E49]'
-                        }`}
-                      >
-                        {formatEuro(bid.amount)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <h2 className="font-display text-lg font-bold text-[#19706D]">
+                  Enkel live bieden in de zaal
+                </h2>
+                <p className="text-sm text-[#5D6C7B] mt-1 leading-relaxed">
+                  Online of rechtstreeks bieden via de website of QR-code is uitgeschakeld. Dit kunstwerk wordt op 16 december live geveild in M Leuven vanaf een startprijs van{' '}
+                  <span className="font-mono font-bold text-[#363E49] tabular-nums">
+                    {formatEuro(artwork.startingBid)}
+                  </span>.
+                </p>
+                <p className="text-xs text-[#5D6C7B] mt-2">
+                  Tip: bewaar dit kunstwerk met het hartje bovenaan zodat je het tijdens de veiling meteen terugvindt in je favorietenlijst.
+                </p>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

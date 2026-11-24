@@ -80,7 +80,7 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
             Grondplan M Leuven
           </h1>
           <p className="text-sm text-[#5D6C7B] mt-2 max-w-2xl">
-            De L-vormige tentoonstellingsopstelling van Art for Climate loopt door Antichambre Deel 1, Antichambre Deel 2 en het Forum. Klik op een zaal of lotnummer om meteen te bieden.
+            De L-vormige tentoonstellingsopstelling van Art for Climate loopt door Antichambre Deel 1, Antichambre Deel 2 en het Forum. Klik op een zaal of lotnummer om het kunstwerk en de startprijs te bekijken.
           </p>
         </div>
 
@@ -270,9 +270,7 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
               <div className="mt-4 pt-3 border-t border-[#E5E5E5] flex items-center justify-between text-xs">
                 <span className="text-[#5D6C7B]">{getStatusLabel(lot.status)}</span>
                 <span className="font-mono font-bold text-[#19706D] tabular-nums">
-                  {lot.currentBid > 0
-                    ? `${formatEuro(lot.currentBid)} (${lot.highestBidderNumber})`
-                    : formatEuro(lot.startingBid)}
+                  Startprijs {formatEuro(lot.startingBid)}
                 </span>
               </div>
             </div>

@@ -218,7 +218,7 @@ export function QrCodeCard({ artwork, compact = false }: QrCodeCardProps) {
 
         <div className="flex-1 min-w-0 text-center sm:text-left">
           <p className="text-xs font-bold text-[#363E49]">
-            Scan ter plekke in M Leuven om te bieden op dit kunstwerk
+            Scan in M Leuven om dit kunstwerk te bekijken en te bewaren
           </p>
           <p className="font-mono text-[11px] text-[#5D6C7B] truncate mt-1" title={lotUrl}>
             {displayHost || `Art for Climate · ${formatLotNumber(artwork.lotNumber)} · M Leuven`}

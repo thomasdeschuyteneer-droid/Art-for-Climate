@@ -1443,7 +1443,7 @@ export function AdminPanel() {
                   QR-bordjes voor M Leuven
                 </h2>
                 <p className="text-xs text-[#5D6C7B] mt-0.5">
-                  Elke QR-code verwijst bezoekers rechtstreeks naar het juiste kunstwerk en activeert bieden ter plekke.
+                  Elke QR-code verwijst bezoekers rechtstreeks naar het juiste kunstwerk (met startprijs en favorietenknop).
                 </p>
               </div>
               <button
