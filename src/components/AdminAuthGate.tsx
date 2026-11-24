@@ -48,29 +48,27 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
           {serverReachable ? (
             <>
               <p>
-                De server draait, maar <span className="font-mono">ADMIN_USERNAME</span> en{' '}
-                <span className="font-mono">ADMIN_PASSWORD</span> ontbreken in de omgevingsvariabelen van deze omgeving.
+                De beheerderslogin is nog niet ingesteld op deze server.
               </p>
               <p className="font-normal text-[#363E49]">
-                Controleer in AI Studio bij <strong>Secrets</strong> of beide variabelen ingesteld zijn en herlaad de pagina.
+                Voeg <span className="font-mono">ADMIN_USERNAME</span> en{' '}
+                <span className="font-mono">ADMIN_PASSWORD</span> toe bij <strong>Secrets</strong> en herlaad de pagina.
               </p>
             </>
           ) : (
             <>
               <p>
-                Je bekijkt momenteel de statische voorbeeldversie zonder actieve Node-server.
+                Alleen voorbeeldweergave (geen live veilingserver op deze link).
               </p>
               <p className="font-normal text-[#363E49]">
-                Op een gedeelde statische link (<span className="font-mono">ais-pre-…</span> of Vercel) draait er geen backend-server voor beheerderstoegang. Open de actieve{' '}
-                <strong>ontwikkel-URL</strong> (<span className="font-mono">ais-dev-…</span>) of deploy de volledige Node-server via <strong>Deploy</strong> in AI Studio zodat{' '}
-                <span className="font-mono">ADMIN_USERNAME</span> en <span className="font-mono">ADMIN_PASSWORD</span> actief zijn.
+                Op deze statische deellink draait geen server, waardoor beheerderstoegang en live biedingen niet actief zijn. Open de actieve live app-omgeving of zet de app live via <strong>Deploy</strong>.
               </p>
               <button
                 type="button"
                 onClick={() => void refreshAuthStatus()}
                 className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white border border-[#923636]/30 text-[11px] font-bold text-[#923636] hover:bg-[#F7F7F7] cursor-pointer"
               >
-                Verbinding opnieuw controleren
+                Opnieuw controleren
               </button>
             </>
           )}

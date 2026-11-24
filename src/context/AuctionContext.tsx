@@ -478,7 +478,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
           );
         }
         throw new Error(
-          'Je bevindt je op de statische voorbeeld-URL zonder actieve Node-server. Open de actieve ontwikkel- of Cloud Run-server-URL (waar ADMIN_USERNAME en ADMIN_PASSWORD in Secrets staan) om als beheerder aan te melden.'
+          'Aanmelden is niet mogelijk op deze statische deellink omdat hier geen live veilingserver draait. Open de actieve live app-omgeving of publiceer via Deploy.'
         );
       }
 
