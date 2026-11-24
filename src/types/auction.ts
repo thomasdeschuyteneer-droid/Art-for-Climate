@@ -110,5 +110,6 @@ export interface AdminAuthStatus {
   hasEnvCredentials: boolean;
   authenticated: boolean;
   username: string | null;
+  serverReachable?: boolean;
 }
 

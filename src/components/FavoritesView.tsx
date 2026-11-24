@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Award, CheckCircle2, Heart, Lock, MapPin, Trash2 } from 'lucide-react';
+import { ArrowRight, Award, CheckCircle2, Heart, Lock, MapPin, QrCode, Trash2, X } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
+import type { Artwork } from '../types/auction';
 import {
   M_LEUVEN_ROOMS,
   formatEuro,
@@ -9,6 +10,7 @@ import {
 } from '../utils/format';
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { FavoriteButton } from './FavoriteButton';
+import { QrCodeCard } from './QrCodeCard';
 import type { AppRoute } from './HeaderNav';
 
 interface FavoritesViewProps {
@@ -26,6 +28,7 @@ export function FavoritesView({ onNavigate, onOpenBidderModal }: FavoritesViewPr
     clearFavorites,
   } = useAuction();
   const [roomFilter, setRoomFilter] = useState<string>('Alle zalen');
+  const [qrArtwork, setQrArtwork] = useState<Artwork | null>(null);
 
   const isAuctionClosed = Boolean(auctionState?.auctionClosed);
 
@@ -481,7 +484,17 @@ export function FavoritesView({ onNavigate, onOpenBidderModal }: FavoritesViewPr
                           <span aria-hidden="true">·</span>
                           <span className="truncate">{artwork.galleryRoom}</span>
                         </div>
-                        <FavoriteButton artworkId={artwork.id} lotNumber={artwork.lotNumber} />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <FavoriteButton artworkId={artwork.id} lotNumber={artwork.lotNumber} />
+                          <button
+                            type="button"
+                            onClick={() => setQrArtwork(artwork)}
+                            aria-label={`Toon QR-code voor Lot ${artwork.lotNumber}`}
+                            className="min-h-[36px] min-w-[36px] rounded-[10px] inline-flex items-center justify-center text-[#5D6C7B] hover:text-[#19706D] hover:bg-[#F7F7F7] cursor-pointer shrink-0"
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <button
@@ -547,6 +560,32 @@ export function FavoritesView({ onNavigate, onOpenBidderModal }: FavoritesViewPr
           </div>
         )}
       </section>
+
+      {qrArtwork && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#363E49]/40 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="QR-code van het kunstwerk"
+        >
+          <div className="w-full max-w-md bg-white border border-[#E5E5E5] rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#E5E5E5]">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#19706D]">
+                QR-code voor M Leuven
+              </span>
+              <button
+                type="button"
+                onClick={() => setQrArtwork(null)}
+                aria-label="Sluit QR-venster"
+                className="min-h-[40px] min-w-[40px] flex items-center justify-center text-[#5D6C7B] hover:text-[#363E49] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <QrCodeCard artwork={qrArtwork} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

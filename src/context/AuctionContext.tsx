@@ -45,6 +45,7 @@ interface AuctionContextValue {
   connected: boolean;
   error: string | null;
   setCurrentBidderNumber: (bidderNumber: string | null) => void;
+  refreshAuthStatus: () => Promise<AdminAuthStatus>;
   loginAdmin: (username: string, password: string) => Promise<void>;
   logoutAdmin: () => Promise<void>;
   registerBidder: (input: BidderRegistrationInput) => Promise<BidderSummary>;
@@ -157,9 +158,10 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const authTokenRef = useRef<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AdminAuthStatus>({
     configured: true,
-    hasEnvCredentials: false,
+    hasEnvCredentials: true,
     authenticated: false,
     username: null,
+    serverReachable: true,
   });
 
   const [backendAvailable, setBackendAvailable] = useState<boolean>(true);
@@ -235,31 +237,37 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const refreshAuthStatus = useCallback(async () => {
-    if (!backendAvailableRef.current) {
-      setMemoryToken(null);
-      setAuthStatus({
-        configured: false,
-        hasEnvCredentials: false,
-        authenticated: false,
-        username: null,
-      });
-      return;
-    }
+  const refreshAuthStatus = useCallback(async (): Promise<AdminAuthStatus> => {
     try {
       const headers: Record<string, string> = {};
       if (authTokenRef.current) {
         headers.Authorization = `Bearer ${authTokenRef.current}`;
       }
-      const res = await fetch('/api/auth/status', { headers });
-      if (!res.ok) return;
+      const res = await fetch('/api/auth/status', { headers, cache: 'no-store' });
+      const ct = res.headers.get('content-type') || '';
+      if (!res.ok || !ct.includes('application/json')) {
+        throw new Error('NO_BACKEND');
+      }
       const data = (await res.json()) as AdminAuthStatus;
-      setAuthStatus(data);
+      const nextStatus: AdminAuthStatus = { ...data, serverReachable: true };
+      backendAvailableRef.current = true;
+      setBackendAvailable(true);
+      setAuthStatus(nextStatus);
       if (!data.authenticated && authTokenRef.current) {
         setMemoryToken(null);
       }
+      return nextStatus;
     } catch {
-      // Negeer
+      const fallback: AdminAuthStatus = {
+        configured: false,
+        hasEnvCredentials: false,
+        authenticated: false,
+        username: null,
+        serverReachable: false,
+      };
+      setMemoryToken(null);
+      setAuthStatus(fallback);
+      return fallback;
     }
   }, [setMemoryToken]);
 
@@ -416,25 +424,37 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const loginAdmin = useCallback(
     async (username: string, password: string) => {
       const cleanUser = username.trim();
-      if (!backendAvailableRef.current) {
+      let res: Response;
+      try {
+        res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: cleanUser, password }),
+        });
+      } catch {
         throw new Error(
-          'Beheerderstoegang vereist een actieve serververbinding met ingestelde beheerdersgegevens.'
+          'Kan geen verbinding maken met de server. Herlaad de pagina en probeer opnieuw.'
         );
       }
 
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password }),
-      });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new Error(
+          'Op deze URL draait enkel statische hosting zonder Node-server. Open de app via de actieve server-URL (waar ADMIN_USERNAME en ADMIN_PASSWORD zijn ingesteld).'
+        );
+      }
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Aanmelden mislukt.');
       }
+      backendAvailableRef.current = true;
+      setBackendAvailable(true);
       setMemoryToken(data.token as string);
+      await refreshState();
       await refreshAuthStatus();
     },
-    [refreshAuthStatus, setMemoryToken]
+    [refreshAuthStatus, refreshState, setMemoryToken]
   );
 
   const logoutAdmin = useCallback(async () => {
@@ -1050,6 +1070,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     connected: connected || !backendAvailable,
     error,
     setCurrentBidderNumber,
+    refreshAuthStatus,
     loginAdmin,
     logoutAdmin,
     registerBidder,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Lock, X } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 
@@ -8,25 +8,22 @@ interface AdminAuthFormProps {
 }
 
 function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps) {
-  const { authStatus, loginAdmin } = useAuction();
+  const { authStatus, refreshAuthStatus, loginAdmin } = useAuction();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    void refreshAuthStatus();
+  }, [refreshAuthStatus]);
+
   const isConfigured = authStatus.configured;
+  const serverReachable = authStatus.serverReachable !== false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!isConfigured) {
-      setError(
-        'Beheerderstoegang is enkel beschikbaar via vooraf ingestelde servergegevens (ADMIN_USERNAME / ADMIN_PASSWORD).'
-      );
-      return;
-    }
-
     setSubmitting(true);
     try {
       await loginAdmin(username, password);
@@ -34,6 +31,7 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Aanmelden mislukt.');
+      void refreshAuthStatus();
     } finally {
       setSubmitting(false);
     }
@@ -46,10 +44,29 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
       </p>
 
       {!isConfigured && (
-        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed">
-          Beheerderstoegang vereist een actieve serveromgeving waarin{' '}
-          <span className="font-mono">ADMIN_USERNAME</span> en{' '}
-          <span className="font-mono">ADMIN_PASSWORD</span> zijn ingesteld.
+        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed space-y-1.5">
+          {serverReachable ? (
+            <>
+              <p>
+                De server draait, maar <span className="font-mono">ADMIN_USERNAME</span> en{' '}
+                <span className="font-mono">ADMIN_PASSWORD</span> ontbreken in de omgevingsvariabelen van deze omgeving.
+              </p>
+              <p className="font-normal text-[#363E49]">
+                Werk je in de gedeelde link? Controleer in AI Studio bij <strong>Secrets</strong> of deze variabelen aanwezig zijn en publiceer/deel opnieuw, of open de ontwikkel-URL.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                Geen actieve backend-server bereikbaar op deze URL (statische hosting).
+              </p>
+              <p className="font-normal text-[#363E49]">
+                Beheerderstoegang werkt enkel wanneer de Node-server draait met{' '}
+                <span className="font-mono">ADMIN_USERNAME</span> en{' '}
+                <span className="font-mono">ADMIN_PASSWORD</span>.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -94,7 +111,7 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
 
         <button
           type="submit"
-          disabled={submitting || !isConfigured}
+          disabled={submitting}
           className="w-full min-h-[46px] px-5 py-2.5 rounded-[12px] bg-[#19706D] hover:bg-[#1E5941] text-white text-sm font-bold transition-colors disabled:opacity-60 cursor-pointer"
         >
           {submitting ? 'Bezig...' : 'Aanmelden'}

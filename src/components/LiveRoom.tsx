@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, Lock } from 'lucide-react';
+import { ArrowRight, Lock, QrCode, X } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import {
   formatEuro,
@@ -12,6 +12,7 @@ import {
 import { ArtworkImageFrame } from './ArtworkImageFrame';
 import { CountdownClock } from './CountdownClock';
 import { FavoriteButton } from './FavoriteButton';
+import { QrCodeCard } from './QrCodeCard';
 import type { AppRoute } from './HeaderNav';
 
 interface LiveRoomProps {
@@ -30,6 +31,7 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
     placeBid,
   } = useAuction();
   const [submitting, setSubmitting] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const activeLot = useMemo(() => {
@@ -129,6 +131,14 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <FavoriteButton artworkId={activeLot.id} lotNumber={activeLot.lotNumber} />
+                <button
+                  type="button"
+                  onClick={() => setQrModalOpen(true)}
+                  aria-label={`Toon QR-code voor Lot ${activeLot.lotNumber}`}
+                  className="min-h-[40px] min-w-[40px] rounded-[10px] border border-[#E5E5E5] text-[#5D6C7B] hover:text-[#19706D] hover:border-[#19706D] inline-flex items-center justify-center cursor-pointer shrink-0"
+                >
+                  <QrCode className="w-4 h-4" aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -397,6 +407,31 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
           </div>
         </div>
       </div>
+      {qrModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#363E49]/40 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="QR-code van het actieve lot"
+        >
+          <div className="w-full max-w-md bg-white border border-[#E5E5E5] rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#E5E5E5]">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#19706D]">
+                QR-code voor M Leuven
+              </span>
+              <button
+                type="button"
+                onClick={() => setQrModalOpen(false)}
+                aria-label="Sluit QR-venster"
+                className="min-h-[40px] min-w-[40px] flex items-center justify-center text-[#5D6C7B] hover:text-[#363E49] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <QrCodeCard artwork={activeLot} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

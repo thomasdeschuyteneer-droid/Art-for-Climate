@@ -45,10 +45,17 @@ export function ArtworkDetail({
     placeBid,
     favoriteIds,
     isFavorite,
+    loading,
   } = useAuction();
   const [zoomed, setZoomed] = useState(false);
 
-  const artworkIndex = artworks.findIndex((a) => a.id === artworkId);
+  const normalizedLookup = artworkId.trim().toLowerCase();
+  const artworkIndex = artworks.findIndex(
+    (a) =>
+      a.id.toLowerCase() === normalizedLookup ||
+      String(a.lotNumber) === normalizedLookup ||
+      `lot-${a.lotNumber}` === normalizedLookup
+  );
   const artwork = artworkIndex >= 0 ? artworks[artworkIndex] : null;
   const prevLot = artworkIndex > 0 ? artworks[artworkIndex - 1] : null;
   const nextLot =
@@ -57,8 +64,8 @@ export function ArtworkDetail({
       : null;
 
   const lotBids = useMemo(
-    () => bids.filter((b) => b.artworkId === artworkId),
-    [bids, artworkId]
+    () => (artwork ? bids.filter((b) => b.artworkId === artwork.id) : []),
+    [bids, artwork]
   );
 
   const suggestedMinimum = artwork
@@ -85,6 +92,16 @@ export function ArtworkDetail({
       );
     }
   }, [artwork?.id, artwork?.currentBid, artwork?.bidCount, artwork?.startingBid]);
+
+  if (!artwork && loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <p className="font-display text-2xl font-bold text-[#19706D]">
+          Kunstwerk wordt geladen...
+        </p>
+      </div>
+    );
+  }
 
   if (!artwork) {
     return (
