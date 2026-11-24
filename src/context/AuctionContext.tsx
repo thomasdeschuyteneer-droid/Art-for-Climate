@@ -18,9 +18,10 @@ interface AuctionUpdatePayload extends Partial<AuctionState> {
 }
 
 export interface BidderRegistrationInput {
+  bidderNumber: string;
   name: string;
-  companyName: string;
-  vatNumber: string;
+  companyName?: string;
+  vatNumber?: string;
   email: string;
   street: string;
   postalCode: string;
@@ -44,7 +45,6 @@ interface AuctionContextValue {
   connected: boolean;
   error: string | null;
   setCurrentBidderNumber: (bidderNumber: string | null) => void;
-  setupAdmin: (username: string, password: string) => Promise<void>;
   loginAdmin: (username: string, password: string) => Promise<void>;
   logoutAdmin: () => Promise<void>;
   registerBidder: (input: BidderRegistrationInput) => Promise<BidderSummary>;
@@ -88,34 +88,6 @@ const FAVORITES_STORAGE_KEY = 'art_for_climate_favorites_v1';
 const LOCAL_SNAPSHOT_KEY = 'art_for_climate_static_snapshot_v12c';
 const LOCAL_BILLING_KEY = 'art_for_climate_static_billing_v5';
 const LOCAL_SETTINGS_KEY = 'art_for_climate_static_settings_v5';
-const LOCAL_ADMIN_HASH_KEY = 'art_for_climate_static_admin_v5';
-
-interface StaticAdminRecord {
-  username: string;
-  salt: string;
-  hash: string;
-}
-
-async function deriveStaticHash(password: string, saltHex: string): Promise<string> {
-  const enc = new TextEncoder();
-  const data = enc.encode(`${saltHex}:${password}`);
-  const digest = await window.crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function loadStaticAdminRecord(): StaticAdminRecord | null {
-  try {
-    const raw = window.localStorage.getItem(LOCAL_ADMIN_HASH_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StaticAdminRecord;
-    if (parsed.username && parsed.salt && parsed.hash) return parsed;
-  } catch {
-    // Negeer
-  }
-  return null;
-}
 
 function loadLocalFallbackSnapshot(): AuctionSnapshot {
   try {
@@ -265,13 +237,13 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuthStatus = useCallback(async () => {
     if (!backendAvailableRef.current) {
-      const staticAdmin = loadStaticAdminRecord();
-      setAuthStatus((prev) => ({
-        configured: Boolean(staticAdmin),
+      setMemoryToken(null);
+      setAuthStatus({
+        configured: false,
         hasEnvCredentials: false,
-        authenticated: Boolean(authTokenRef.current && staticAdmin),
-        username: authTokenRef.current && staticAdmin ? prev.username : null,
-      }));
+        authenticated: false,
+        username: null,
+      });
       return;
     }
     try {
@@ -441,77 +413,13 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     [setMemoryToken]
   );
 
-  const setupAdmin = useCallback(
-    async (username: string, password: string) => {
-      const cleanUser = username.trim();
-      if (!backendAvailableRef.current) {
-        const existing = loadStaticAdminRecord();
-        if (existing) {
-          throw new Error('Beheerderstoegang is reeds ingesteld.');
-        }
-        if (cleanUser.length < 3 || password.length < 4) {
-          throw new Error('Vul een geldige gebruikersnaam en wachtwoord in (min. 4 tekens).');
-        }
-        const saltBytes = window.crypto.getRandomValues(new Uint8Array(16));
-        const salt = Array.from(saltBytes)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join('');
-        const hash = await deriveStaticHash(password, salt);
-        window.localStorage.setItem(
-          LOCAL_ADMIN_HASH_KEY,
-          JSON.stringify({ username: cleanUser, salt, hash })
-        );
-        const token = `static-${Date.now()}`;
-        setMemoryToken(token);
-        setAuthStatus({
-          configured: true,
-          hasEnvCredentials: false,
-          authenticated: true,
-          username: cleanUser,
-        });
-        return;
-      }
-
-      const res = await fetch('/api/auth/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Instellen van beheerderstoegang mislukt.');
-      }
-      setMemoryToken(data.token as string);
-      setAuthStatus({
-        configured: true,
-        hasEnvCredentials: false,
-        authenticated: true,
-        username: data.username as string,
-      });
-    },
-    [setMemoryToken]
-  );
-
   const loginAdmin = useCallback(
     async (username: string, password: string) => {
       const cleanUser = username.trim();
       if (!backendAvailableRef.current) {
-        const rec = loadStaticAdminRecord();
-        if (!rec) {
-          throw new Error('Beheerderstoegang is nog niet ingesteld.');
-        }
-        const derived = await deriveStaticHash(password, rec.salt);
-        if (cleanUser !== rec.username || derived !== rec.hash) {
-          throw new Error('Ongeldige gebruikersnaam of wachtwoord.');
-        }
-        setMemoryToken(`static-${Date.now()}`);
-        setAuthStatus({
-          configured: true,
-          hasEnvCredentials: false,
-          authenticated: true,
-          username: rec.username,
-        });
-        return;
+        throw new Error(
+          'Beheerderstoegang vereist een actieve serververbinding met ingestelde beheerdersgegevens.'
+        );
       }
 
       const res = await fetch('/api/auth/login', {
@@ -589,66 +497,84 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
   const registerBidder = useCallback(
     async (input: BidderRegistrationInput) => {
       if (!backendAvailableRef.current) {
-        const normalizedVat = normalizeVatNumber(input.vatNumber);
-        if (!normalizedVat) {
-          throw new Error('Vul een geldig btw-nummer in voor facturatie (bv. BE 0544.963.123).');
-        }
-        const currentProfiles = loadLocalBillingProfiles();
-        const existingSameBoth = currentProfiles.find(
-          (b) =>
-            b.vatNumber === normalizedVat &&
-            b.email &&
-            b.email.toLowerCase() === input.email.trim().toLowerCase()
-        );
-        if (existingSameBoth) {
-          const summary: BidderSummary = {
-            bidderNumber: existingSameBoth.bidderNumber,
-            city: existingSameBoth.city,
-            registeredAt: existingSameBoth.registeredAt,
-          };
-          setCurrentBidderNumber(summary.bidderNumber);
-          return summary;
-        }
-        const existingConflict = currentProfiles.find(
-          (b) =>
-            b.vatNumber === normalizedVat ||
-            (b.email && b.email.toLowerCase() === input.email.trim().toLowerCase())
-        );
-        if (existingConflict) {
+        const normalizedNumber = normalizeBidderNumber(input.bidderNumber);
+        if (!normalizedNumber) {
           throw new Error(
-            'Dit e-mailadres of btw-nummer is reeds geregistreerd. Gebruik je eerder ontvangen biednummer.'
+            'Biednummer is verplicht. Vul het nummer van jouw bordje in (bv. #027).'
           );
         }
+        const rawVat = (input.vatNumber ?? '').trim();
+        let normalizedVat = '';
+        if (rawVat) {
+          const parsed = normalizeVatNumber(rawVat);
+          if (!parsed) {
+            throw new Error('Het opgegeven btw-nummer is ongeldig (bv. BE 0544.963.123).');
+          }
+          normalizedVat = parsed;
+        }
+        const cleanEmail = input.email.trim();
+        const currentProfiles = loadLocalBillingProfiles();
+        const existingSameEmail = currentProfiles.find(
+          (b) => b.email && b.email.toLowerCase() === cleanEmail.toLowerCase()
+        );
+        if (existingSameEmail && existingSameEmail.bidderNumber !== normalizedNumber) {
+          throw new Error(
+            `Dit e-mailadres is reeds gekoppeld aan biednummer ${existingSameEmail.bidderNumber}.`
+          );
+        }
+        const existingByNumber = currentProfiles.find(
+          (b) => b.bidderNumber === normalizedNumber
+        );
+        if (existingByNumber) {
+          if (
+            existingByNumber.email &&
+            existingByNumber.email.toLowerCase() === cleanEmail.toLowerCase()
+          ) {
+            const summary: BidderSummary = {
+              bidderNumber: existingByNumber.bidderNumber,
+              city: existingByNumber.city,
+              registeredAt: existingByNumber.registeredAt,
+            };
+            setCurrentBidderNumber(summary.bidderNumber);
+            return summary;
+          }
+          if (existingByNumber.email) {
+            throw new Error(
+              `Biednummer ${normalizedNumber} is al ingeschreven. Meld je aan via "Al ingeschreven? Inloggen".`
+            );
+          }
+        }
 
-        const maxNum = currentProfiles.reduce((m, b) => {
-          const p = Number.parseInt(b.bidderNumber.replace('#', ''), 10);
-          return Number.isFinite(p) && p > m ? p : m;
-        }, 0);
         const profile: BidderBillingProfile = {
-          bidderNumber: `#${String(maxNum + 1).padStart(3, '0')}`,
+          bidderNumber: normalizedNumber,
           name: input.name.trim(),
-          companyName: input.companyName.trim(),
+          companyName: (input.companyName ?? '').trim(),
           vatNumber: normalizedVat,
-          email: input.email.trim(),
+          email: cleanEmail,
           street: input.street.trim(),
           postalCode: input.postalCode.trim(),
           city: input.city.trim(),
           country: (input.country || 'België').trim(),
-          registeredAt: new Date().toISOString(),
+          registeredAt: existingByNumber?.registeredAt ?? new Date().toISOString(),
         };
-        currentProfiles.push(profile);
+        const updatedProfiles = existingByNumber
+          ? currentProfiles.map((p) => (p.bidderNumber === normalizedNumber ? profile : p))
+          : [...currentProfiles, profile];
 
         const summary: BidderSummary = {
           bidderNumber: profile.bidderNumber,
           city: profile.city,
           registeredAt: profile.registeredAt,
         };
+        const nextBidders = snapshot.bidders.some((b) => b.bidderNumber === summary.bidderNumber)
+          ? snapshot.bidders
+          : [...snapshot.bidders, summary];
         const nextSnap: AuctionSnapshot = {
           ...snapshot,
-          bidders: [...snapshot.bidders, summary],
+          bidders: nextBidders,
         };
         setSnapshot(nextSnap);
-        persistLocalFallback(nextSnap, currentProfiles);
+        persistLocalFallback(nextSnap, updatedProfiles);
         setCurrentBidderNumber(summary.bidderNumber);
         return summary;
       }
@@ -677,13 +603,17 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
       bidderNumber?: string;
       source?: 'qr' | 'floor';
     }) => {
-      const rawTarget = input.bidderNumber ?? currentBidderNumber ?? '';
-      const targetNumber = normalizeBidderNumber(rawTarget);
-      if (!targetNumber) {
-        throw new Error('Vul eerst een geldig biedernummer in (bv. #027) of schrijf je in.');
+      const source = input.source ?? 'qr';
+      if (source !== 'floor' && !currentBidderNumber) {
+        throw new Error('Log eerst in met jouw biednummer om een bod uit te brengen.');
       }
 
-      const source = input.source ?? 'qr';
+      const rawTarget = source === 'floor' ? (input.bidderNumber ?? '') : (currentBidderNumber ?? '');
+      const targetNumber = normalizeBidderNumber(rawTarget);
+      if (!targetNumber) {
+        throw new Error('Biednummer is verplicht om een bod uit te brengen (bv. #027).');
+      }
+
       if (source !== 'floor' && !onSiteVerifiedState) {
         throw new Error(
           'Bieden kan enkel ter plekke in M Leuven. Bevestig eerst je aanwezigheid in de zaal.'
@@ -1120,7 +1050,6 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
     connected: connected || !backendAvailable,
     error,
     setCurrentBidderNumber,
-    setupAdmin,
     loginAdmin,
     logoutAdmin,
     registerBidder,

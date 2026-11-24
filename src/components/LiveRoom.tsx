@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, Lock } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 import {
   formatEuro,
@@ -29,15 +29,8 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
     setOnSiteVerified,
     placeBid,
   } = useAuction();
-  const [bidderInput, setBidderInput] = useState(currentBidderNumber ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  useEffect(() => {
-    if (currentBidderNumber) {
-      setBidderInput(currentBidderNumber);
-    }
-  }, [currentBidderNumber]);
 
   const activeLot = useMemo(() => {
     return (
@@ -55,7 +48,7 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
 
   const handleQuickBid = async (targetAmount: number) => {
     if (!activeLot) return;
-    const normalized = normalizeBidderNumber(bidderInput);
+    const normalized = currentBidderNumber ? normalizeBidderNumber(currentBidderNumber) : null;
     if (!normalized) {
       onOpenBidderModal();
       return;
@@ -189,61 +182,88 @@ export function LiveRoom({ onNavigate, onOpenBidderModal }: LiveRoomProps) {
 
             {isAuctionOpen ? (
               <div className="p-5 sm:p-6 border-t border-[#E5E5E5] bg-white space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <label htmlFor="live-bidder-input" className="text-xs font-bold text-[#363E49]">
-                      Biednummer:
-                    </label>
-                    <input
-                      id="live-bidder-input"
-                      type="text"
-                      value={bidderInput}
-                      onChange={(e) => setBidderInput(e.target.value)}
-                      placeholder="#027"
-                      className="w-28 min-h-[38px] px-3 py-1 rounded-[10px] border border-[#E5E5E5] font-mono text-sm font-bold text-[#363E49] focus:outline-none focus:border-[#19706D]"
-                    />
+                {!currentBidderNumber ? (
+                  <div className="p-4 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-[#DEE9EC] text-[#19706D] flex items-center justify-center shrink-0">
+                        <Lock className="w-4 h-4" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-[#363E49]">
+                          Log eerst in om mee te bieden
+                        </p>
+                        <p className="text-xs text-[#5D6C7B] mt-0.5">
+                          Enkel ingelogde bieders met een biednummer kunnen een bod uitbrengen (btw-nummer is niet verplicht).
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onOpenBidderModal}
+                      className="min-h-[42px] px-4 py-2 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Inloggen / Inschrijven
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={onOpenBidderModal}
-                    className="text-xs font-bold text-[#19706D] underline cursor-pointer"
-                  >
-                    {currentBidderNumber ? 'Wijzig biednummer' : 'Schrijf je in'}
-                  </button>
-                </div>
-
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={onSiteVerified}
-                    onChange={(e) => setOnSiteVerified(e.target.checked)}
-                    className="w-4 h-4 accent-[#19706D] shrink-0"
-                  />
-                  <span>
-                    Enkel ter plekke: ik bevestig dat ik aanwezig ben in M Leuven.
-                  </span>
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[50, 100, 250].map((inc) => {
-                    const amount =
-                      activeLot.currentBid > 0
-                        ? activeLot.currentBid + inc
-                        : activeLot.startingBid + (inc === 50 ? 0 : inc);
-                    return (
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <label htmlFor="live-bidder-input" className="text-xs font-bold text-[#363E49]">
+                          Biednummer *:
+                        </label>
+                        <input
+                          id="live-bidder-input"
+                          type="text"
+                          required
+                          readOnly
+                          value={currentBidderNumber}
+                          className="w-28 min-h-[38px] px-3 py-1 rounded-[10px] border border-[#B4C232]/60 bg-[#F0F3E1] font-mono text-sm font-bold text-[#1E5941] focus:outline-none"
+                        />
+                      </div>
                       <button
-                        key={inc}
                         type="button"
-                        disabled={submitting}
-                        onClick={() => void handleQuickBid(amount)}
-                        className="min-h-[48px] px-4 py-2.5 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+                        onClick={onOpenBidderModal}
+                        className="text-xs font-bold text-[#19706D] underline cursor-pointer"
                       >
-                        Bod uitbrengen ·{' '}
-                        <span className="font-mono tabular-nums">{formatEuro(amount)}</span>
+                        Wijzig biednummer
                       </button>
-                    );
-                  })}
-                </div>
+                    </div>
+
+                    <label className="flex items-center gap-3 p-3 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={onSiteVerified}
+                        onChange={(e) => setOnSiteVerified(e.target.checked)}
+                        className="w-4 h-4 accent-[#19706D] shrink-0"
+                      />
+                      <span>
+                        Enkel ter plekke: ik bevestig dat ik aanwezig ben in M Leuven.
+                      </span>
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[50, 100, 250].map((inc) => {
+                        const amount =
+                          activeLot.currentBid > 0
+                            ? activeLot.currentBid + inc
+                            : activeLot.startingBid + (inc === 50 ? 0 : inc);
+                        return (
+                          <button
+                            key={inc}
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => void handleQuickBid(amount)}
+                            className="min-h-[48px] px-4 py-2.5 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            Bod uitbrengen ·{' '}
+                            <span className="font-mono tabular-nums">{formatEuro(amount)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {feedback && (
                   <p

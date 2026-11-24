@@ -117,7 +117,7 @@ export function HeaderNav({
                 : 'bg-[#3C7F90] text-white hover:bg-[#19706D]'
             }`}
           >
-            {bidderNumber ? `Bieder ${bidderNumber}` : 'Schrijf je in'}
+            {bidderNumber ? `Bieder ${bidderNumber}` : 'Inloggen / Inschrijven'}
           </button>
 
           {isAdmin && (

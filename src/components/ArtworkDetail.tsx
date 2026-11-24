@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Heart,
+  Lock,
   Maximize2,
   X,
 } from 'lucide-react';
@@ -64,19 +65,12 @@ export function ArtworkDetail({
     ? getSuggestedMinimumBid(artwork.currentBid, artwork.startingBid, artwork.bidCount)
     : 0;
 
-  const [bidderInput, setBidderInput] = useState<string>(currentBidderNumber ?? '');
   const [bidInput, setBidInput] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-
-  useEffect(() => {
-    if (currentBidderNumber) {
-      setBidderInput(currentBidderNumber);
-    }
-  }, [currentBidderNumber]);
 
   useEffect(() => {
     if (artwork) {
@@ -112,21 +106,17 @@ export function ArtworkDetail({
     );
   }
 
-  const normalizedEnteredBidder = normalizeBidderNumber(bidderInput);
   const isLeadingBidder =
-    Boolean(normalizedEnteredBidder) &&
-    artwork.highestBidderNumber === normalizedEnteredBidder;
+    Boolean(currentBidderNumber) &&
+    artwork.highestBidderNumber === currentBidderNumber;
   const isAuctionOpen =
     artwork.status === 'live' && !auctionState?.auctionClosed;
 
   const handleSubmitBid = async (amountToBid: number) => {
     setFeedback(null);
-    const activeNumber = normalizeBidderNumber(bidderInput);
+    const activeNumber = currentBidderNumber ? normalizeBidderNumber(currentBidderNumber) : null;
     if (!activeNumber) {
-      setFeedback({
-        type: 'error',
-        message: 'Vul je biedernummer in (bv. #027) of schrijf je eerst in.',
-      });
+      onOpenBidderModal();
       return;
     }
 
@@ -365,14 +355,14 @@ export function ArtworkDetail({
               </div>
             )}
 
-            {isLeadingBidder && (
+            {isLeadingBidder && currentBidderNumber && (
               <p className="text-xs font-bold text-[#1E5941]">
-                Jouw biednummer {normalizedEnteredBidder} staat momenteel bovenaan.
+                Jouw biednummer {currentBidderNumber} staat momenteel bovenaan.
               </p>
             )}
           </div>
 
-          {/* Biedformulier: Biednummer + Bedrag + Bod uitbrengen */}
+          {/* Biedformulier: enkel toegankelijk wanneer ingelogd met biednummer */}
           {isAuctionOpen ? (
             <div className="border border-[#E5E5E5] rounded-2xl p-5 sm:p-6 bg-white space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -392,117 +382,143 @@ export function ArtworkDetail({
                   </p>
                 </div>
 
-                {!currentBidderNumber && (
+                {currentBidderNumber && (
                   <button
                     type="button"
                     onClick={onOpenBidderModal}
-                    className="min-h-[38px] px-4 py-1.5 rounded-[10px] text-xs font-bold bg-[#F0F3E1] text-[#1E5941] border border-[#B4C232]/50 hover:bg-[#DEE9EC] cursor-pointer whitespace-nowrap shrink-0"
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-[10px] text-xs font-bold bg-[#F0F3E1] text-[#1E5941] border border-[#B4C232]/50 hover:bg-[#DEE9EC] cursor-pointer whitespace-nowrap shrink-0"
                   >
-                    Nog geen nummer? Schrijf je in
+                    Wijzig biednummer
                   </button>
                 )}
               </div>
 
-              <label className="flex items-center gap-3 p-3.5 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={onSiteVerified}
-                  onChange={(e) => setOnSiteVerified(e.target.checked)}
-                  className="w-4 h-4 accent-[#19706D] shrink-0"
-                />
-                <span>
-                  Ik ben ter plekke aanwezig in M Leuven om deel te nemen aan de veiling.
-                </span>
-              </label>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                {[50, 100, 250].map((inc) => {
-                  const targetAmount =
-                    artwork.currentBid > 0
-                      ? baseForQuickIncrements + inc
-                      : artwork.startingBid + (inc === 50 ? 0 : inc);
-                  return (
-                    <button
-                      key={inc}
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => {
-                        setBidInput(String(targetAmount));
-                        void handleSubmitBid(targetAmount);
-                      }}
-                      className="min-h-[48px] px-2 py-2 rounded-[12px] border border-[#E5E5E5] hover:border-[#19706D] hover:bg-[#F0F3E1] text-center transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <span className="block text-[11px] text-[#5D6C7B]">
-                        {artwork.currentBid > 0
-                          ? `+€ ${inc}`
-                          : inc === 50
-                            ? 'Startbod'
-                            : `+€ ${inc}`}
-                      </span>
-                      <span className="block font-mono text-sm font-bold text-[#363E49] tabular-nums">
-                        {formatEuro(targetAmount)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <form onSubmit={handleFormSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="bidder-number-input"
-                      className="block text-xs font-bold text-[#363E49] mb-1.5"
-                    >
-                      Biednummer
-                    </label>
-                    <input
-                      id="bidder-number-input"
-                      type="text"
-                      required
-                      value={bidderInput}
-                      onChange={(e) => setBidderInput(e.target.value)}
-                      placeholder="bv. #027"
-                      className="w-full min-h-[48px] px-3.5 py-2 rounded-[12px] font-mono text-base font-bold border border-[#E5E5E5] bg-white text-[#363E49] tabular-nums focus:outline-none focus:border-[#19706D]"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="bid-amount-input"
-                      className="block text-xs font-bold text-[#363E49] mb-1.5"
-                    >
-                      Bedrag (€)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-[#5D6C7B]">
-                        €
-                      </span>
-                      <input
-                        id="bid-amount-input"
-                        type="number"
-                        required
-                        min={
-                          artwork.bidCount > 0
-                            ? artwork.currentBid + 1
-                            : artwork.startingBid
-                        }
-                        step={1}
-                        value={bidInput}
-                        onChange={(e) => setBidInput(e.target.value)}
-                        className="w-full min-h-[48px] pl-8 pr-4 py-2 rounded-[12px] font-mono text-base font-bold border border-[#E5E5E5] bg-white text-[#363E49] tabular-nums focus:outline-none focus:border-[#19706D]"
-                      />
+              {!currentBidderNumber ? (
+                <div className="p-5 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[#DEE9EC] text-[#19706D] flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#363E49]">
+                        Log eerst in om een bod uit te brengen
+                      </p>
+                      <p className="text-xs text-[#5D6C7B] mt-1 leading-relaxed">
+                        Enkel ingelogde bieders met een geldig biednummer kunnen meebieden. Nog geen nummer? Schrijf je in binnen 30 seconden (btw-nummer is niet verplicht).
+                      </p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={onOpenBidderModal}
+                    className="w-full min-h-[46px] px-5 py-2.5 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold transition-colors cursor-pointer"
+                  >
+                    Inloggen / Inschrijven met biednummer
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl bg-[#F7F7F7] border border-[#E5E5E5] text-xs font-semibold text-[#363E49] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onSiteVerified}
+                      onChange={(e) => setOnSiteVerified(e.target.checked)}
+                      className="w-4 h-4 accent-[#19706D] shrink-0"
+                    />
+                    <span>
+                      Ik ben ter plekke aanwezig in M Leuven om deel te nemen aan de veiling.
+                    </span>
+                  </label>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full min-h-[48px] px-7 py-3 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold tracking-wide transition-colors disabled:opacity-60 cursor-pointer"
-                >
-                  {submitting ? 'Bod wordt verwerkt...' : 'Bod uitbrengen'}
-                </button>
-              </form>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[50, 100, 250].map((inc) => {
+                      const targetAmount =
+                        artwork.currentBid > 0
+                          ? baseForQuickIncrements + inc
+                          : artwork.startingBid + (inc === 50 ? 0 : inc);
+                      return (
+                        <button
+                          key={inc}
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => {
+                            setBidInput(String(targetAmount));
+                            void handleSubmitBid(targetAmount);
+                          }}
+                          className="min-h-[48px] px-2 py-2 rounded-[12px] border border-[#E5E5E5] hover:border-[#19706D] hover:bg-[#F0F3E1] text-center transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <span className="block text-[11px] text-[#5D6C7B]">
+                            {artwork.currentBid > 0
+                              ? `+€ ${inc}`
+                              : inc === 50
+                                ? 'Startbod'
+                                : `+€ ${inc}`}
+                          </span>
+                          <span className="block font-mono text-sm font-bold text-[#363E49] tabular-nums">
+                            {formatEuro(targetAmount)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <form onSubmit={handleFormSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label
+                          htmlFor="bidder-number-input"
+                          className="block text-xs font-bold text-[#363E49] mb-1.5"
+                        >
+                          Biednummer *
+                        </label>
+                        <input
+                          id="bidder-number-input"
+                          type="text"
+                          required
+                          readOnly
+                          value={currentBidderNumber}
+                          className="w-full min-h-[48px] px-3.5 py-2 rounded-[12px] font-mono text-base font-bold border border-[#B4C232]/60 bg-[#F0F3E1] text-[#1E5941] tabular-nums focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="bid-amount-input"
+                          className="block text-xs font-bold text-[#363E49] mb-1.5"
+                        >
+                          Bedrag (€) *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-sm text-[#5D6C7B]">
+                            €
+                          </span>
+                          <input
+                            id="bid-amount-input"
+                            type="number"
+                            required
+                            min={
+                              artwork.bidCount > 0
+                                ? artwork.currentBid + 1
+                                : artwork.startingBid
+                            }
+                            step={1}
+                            value={bidInput}
+                            onChange={(e) => setBidInput(e.target.value)}
+                            className="w-full min-h-[48px] pl-8 pr-4 py-2 rounded-[12px] font-mono text-base font-bold border border-[#E5E5E5] bg-white text-[#363E49] tabular-nums focus:outline-none focus:border-[#19706D]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full min-h-[48px] px-7 py-3 rounded-[12px] bg-[#3C7F90] hover:bg-[#19706D] text-white text-sm font-bold tracking-wide transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      {submitting ? 'Bod wordt verwerkt...' : 'Bod uitbrengen'}
+                    </button>
+                  </form>
+                </>
+              )}
 
               {feedback && (
                 <div

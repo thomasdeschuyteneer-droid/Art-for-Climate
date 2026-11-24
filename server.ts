@@ -333,17 +333,6 @@ function timingSafeCompareText(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function hashPasswordScrypt(password: string, saltHex: string): string {
-  return crypto.scryptSync(password, saltHex, 64).toString('hex');
-}
-
-function verifyPasswordScrypt(password: string, saltHex: string, storedHashHex: string): boolean {
-  const derived = crypto.scryptSync(password, saltHex, 64);
-  const expected = Buffer.from(storedHashHex, 'hex');
-  if (derived.length !== expected.length) return false;
-  return crypto.timingSafeEqual(derived, expected);
-}
-
 function signAdminToken(username: string): string {
   const payload = Buffer.from(
     JSON.stringify({
@@ -603,48 +592,20 @@ async function startServer(): Promise<void> {
 
   app.get('/api/auth/status', (req, res) => {
     const envCreds = getEnvAdminCredentials();
-    const hasClaimed = Boolean(db.adminCredential?.passwordHash);
     const verified = verifyAdminFromRequest(req);
     res.json({
-      configured: Boolean(envCreds) || hasClaimed,
+      configured: Boolean(envCreds),
       hasEnvCredentials: Boolean(envCreds),
       authenticated: Boolean(verified),
       username: verified?.username ?? null,
     });
   });
 
-  app.post('/api/auth/setup', authLimiter, (req, res) => {
-    const envCreds = getEnvAdminCredentials();
-    if (envCreds || db.adminCredential?.passwordHash) {
-      res.status(409).json({
-        error: 'Beheerderstoegang is reeds ingesteld. Gebruik het aanmeldformulier.',
-      });
-      return;
-    }
-    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
-    const password = typeof req.body?.password === 'string' ? req.body.password : '';
-
-    if (username.length < 3 || username.length > 64) {
-      res.status(400).json({ error: 'Gebruikersnaam moet tussen 3 en 64 tekens lang zijn.' });
-      return;
-    }
-    if (password.length < 4 || password.length > 128) {
-      res.status(400).json({ error: 'Wachtwoord moet minstens 4 tekens lang zijn.' });
-      return;
-    }
-
-    const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = hashPasswordScrypt(password, salt);
-    db.adminCredential = {
-      username,
-      passwordHash,
-      salt,
-      claimedAt: new Date().toISOString(),
-    };
-    persistDB();
-
-    const token = signAdminToken(username);
-    res.status(201).json({ token, username });
+  app.post('/api/auth/setup', authLimiter, (_req, res) => {
+    res.status(403).json({
+      error:
+        'Nieuwe beheerdersaccounts aanmaken is uitgeschakeld. Enkel vooraf ingestelde beheerdersgegevens zijn geldig.',
+    });
   });
 
   app.post('/api/auth/login', authLimiter, (req, res) => {
@@ -652,38 +613,22 @@ async function startServer(): Promise<void> {
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
     const envCreds = getEnvAdminCredentials();
-    if (envCreds) {
-      const userOk = timingSafeCompareText(username, envCreds.username);
-      const passOk = timingSafeCompareText(password, envCreds.password);
-      if (!userOk || !passOk) {
-        res.status(401).json({ error: 'Ongeldige gebruikersnaam of wachtwoord.' });
-        return;
-      }
-      const token = signAdminToken(envCreds.username);
-      res.json({ token, username: envCreds.username });
-      return;
-    }
-
-    if (!db.adminCredential?.passwordHash) {
-      res.status(409).json({
-        error: 'Er is nog geen beheerdersaccount ingesteld. Stel eerst de toegang in.',
+    if (!envCreds) {
+      res.status(503).json({
+        error:
+          'Beheerderstoegang is nog niet ingesteld op de server (ADMIN_USERNAME / ADMIN_PASSWORD).',
       });
       return;
     }
 
-    const userOk = timingSafeCompareText(username, db.adminCredential.username);
-    const passOk = verifyPasswordScrypt(
-      password,
-      db.adminCredential.salt,
-      db.adminCredential.passwordHash
-    );
+    const userOk = timingSafeCompareText(username, envCreds.username);
+    const passOk = timingSafeCompareText(password, envCreds.password);
     if (!userOk || !passOk) {
       res.status(401).json({ error: 'Ongeldige gebruikersnaam of wachtwoord.' });
       return;
     }
-
-    const token = signAdminToken(db.adminCredential.username);
-    res.json({ token, username: db.adminCredential.username });
+    const token = signAdminToken(envCreds.username);
+    res.json({ token, username: envCreds.username });
   });
 
   app.post('/api/auth/logout', (_req, res) => {
@@ -724,6 +669,17 @@ async function startServer(): Promise<void> {
   });
 
   app.post('/api/bidders', bidderRegLimiter, (req, res) => {
+    const rawBidderNumber =
+      typeof req.body?.bidderNumber === 'string' ? req.body.bidderNumber.trim() : '';
+    const normalizedBidderNumber = normalizeBidderInput(rawBidderNumber);
+    if (!normalizedBidderNumber) {
+      res.status(400).json({
+        error:
+          'Biednummer is verplicht. Vul het nummer in dat je bij aankomst op jouw bordje kreeg (bijvoorbeeld #027).',
+      });
+      return;
+    }
+
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
     const companyName = typeof req.body?.companyName === 'string' ? req.body.companyName.trim() : '';
     const rawVat = typeof req.body?.vatNumber === 'string' ? req.body.vatNumber.trim() : '';
@@ -734,25 +690,25 @@ async function startServer(): Promise<void> {
     const country = typeof req.body?.country === 'string' ? req.body.country.trim() : 'België';
 
     if (!name || name.length < 2) {
-      res.status(400).json({ error: 'Vul je volledige naam in om een biednummer te ontvangen.' });
+      res.status(400).json({ error: 'Vul je volledige naam in om je biednummer te koppelen.' });
       return;
     }
 
-    if (!companyName || companyName.length < 2) {
-      res.status(400).json({ error: 'Vul de bedrijfsnaam of tenaamstelling voor de factuur in.' });
-      return;
-    }
-
-    const normalizedVat = normalizeVatNumber(rawVat);
-    if (!normalizedVat) {
-      res.status(400).json({
-        error: 'Vul een geldig btw-nummer in voor facturatie (bijvoorbeeld BE 0544.963.123).',
-      });
-      return;
+    let normalizedVat = '';
+    if (rawVat) {
+      const parsedVat = normalizeVatNumber(rawVat);
+      if (!parsedVat) {
+        res.status(400).json({
+          error:
+            'Het opgegeven btw-nummer is ongeldig (bijvoorbeeld BE 0544.963.123). Laat het veld leeg als je zonder btw-nummer inschrijft.',
+        });
+        return;
+      }
+      normalizedVat = parsedVat;
     }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      res.status(400).json({ error: 'Vul een geldig e-mailadres in voor het verzenden van de factuur.' });
+      res.status(400).json({ error: 'Vul een geldig e-mailadres in voor bevestiging en opvolging.' });
       return;
     }
 
@@ -763,45 +719,81 @@ async function startServer(): Promise<void> {
       return;
     }
 
-    const existingSameBoth = db.bidders.find(
-      (b) =>
-        b.email &&
-        b.vatNumber &&
-        b.email.toLowerCase() === email.toLowerCase() &&
-        b.vatNumber === normalizedVat
+    const existingByNumber = db.bidders.find((b) => b.bidderNumber === normalizedBidderNumber);
+    const existingSameEmail = db.bidders.find(
+      (b) => b.email && b.email.toLowerCase() === email.toLowerCase()
     );
-    if (existingSameBoth) {
-      res.json({
-        bidder: {
-          bidderNumber: existingSameBoth.bidderNumber,
-          city: existingSameBoth.city,
-          registeredAt: existingSameBoth.registeredAt,
-        },
-        existing: true,
-      });
-      return;
-    }
 
-    const existingConflict = db.bidders.find(
-      (b) =>
-        (b.email && b.email.toLowerCase() === email.toLowerCase()) ||
-        (b.vatNumber && b.vatNumber === normalizedVat)
-    );
-    if (existingConflict) {
+    if (existingSameEmail && existingSameEmail.bidderNumber !== normalizedBidderNumber) {
       res.status(409).json({
-        error:
-          'Dit e-mailadres of btw-nummer is reeds geregistreerd. Gebruik je eerder ontvangen biednummer of vraag hulp aan het onthaal in M Leuven.',
+        error: `Dit e-mailadres is reeds gekoppeld aan biednummer ${existingSameEmail.bidderNumber}. Meld je aan met dat biednummer of vraag hulp aan het onthaal.`,
       });
       return;
     }
 
-    const maxNum = db.bidders.reduce((max, b) => {
-      const parsed = Number.parseInt(b.bidderNumber.replace('#', ''), 10);
-      return Number.isFinite(parsed) && parsed > max ? parsed : max;
-    }, 0);
+    if (normalizedVat) {
+      const existingVatConflict = db.bidders.find(
+        (b) =>
+          b.vatNumber &&
+          b.vatNumber === normalizedVat &&
+          b.bidderNumber !== normalizedBidderNumber
+      );
+      if (existingVatConflict) {
+        res.status(409).json({
+          error: `Dit btw-nummer is reeds geregistreerd op biednummer ${existingVatConflict.bidderNumber}. Meld je aan met dat biednummer of vraag hulp aan het onthaal.`,
+        });
+        return;
+      }
+    }
+
+    if (existingByNumber) {
+      const isFloorPlaceholder =
+        !existingByNumber.email && existingByNumber.name.startsWith('Zaalbieder ');
+      if (isFloorPlaceholder) {
+        existingByNumber.name = name.slice(0, 80);
+        existingByNumber.companyName = companyName.slice(0, 120);
+        existingByNumber.vatNumber = normalizedVat;
+        existingByNumber.email = email.slice(0, 120);
+        existingByNumber.street = street.slice(0, 140);
+        existingByNumber.postalCode = postalCode.slice(0, 20);
+        existingByNumber.city = city.slice(0, 60);
+        existingByNumber.country = (country || 'België').slice(0, 60);
+        persistDB();
+        broadcastState('bidder_updated');
+        res.json({
+          bidder: {
+            bidderNumber: existingByNumber.bidderNumber,
+            city: existingByNumber.city,
+            registeredAt: existingByNumber.registeredAt,
+          },
+          existing: false,
+        });
+        return;
+      }
+
+      if (
+        existingByNumber.email &&
+        existingByNumber.email.toLowerCase() === email.toLowerCase()
+      ) {
+        res.json({
+          bidder: {
+            bidderNumber: existingByNumber.bidderNumber,
+            city: existingByNumber.city,
+            registeredAt: existingByNumber.registeredAt,
+          },
+          existing: true,
+        });
+        return;
+      }
+
+      res.status(409).json({
+        error: `Biednummer ${normalizedBidderNumber} is al ingeschreven. Ben jij dit? Gebruik dan "Al ingeschreven? Inloggen" met jouw biednummer.`,
+      });
+      return;
+    }
 
     const bidder: BidderRecord = {
-      bidderNumber: formatBidderNumber(maxNum + 1),
+      bidderNumber: normalizedBidderNumber,
       name: name.slice(0, 80),
       companyName: companyName.slice(0, 120),
       vatNumber: normalizedVat,
@@ -852,13 +844,18 @@ async function startServer(): Promise<void> {
     if (typeof req.body?.companyName === 'string') {
       bidder.companyName = req.body.companyName.trim().slice(0, 120);
     }
-    if (typeof req.body?.vatNumber === 'string' && req.body.vatNumber.trim()) {
-      const normalizedVat = normalizeVatNumber(req.body.vatNumber);
-      if (!normalizedVat) {
-        res.status(400).json({ error: 'Ongeldig btw-nummer (bv. BE 0544.963.123).' });
-        return;
+    if (typeof req.body?.vatNumber === 'string') {
+      const trimmedVat = req.body.vatNumber.trim();
+      if (!trimmedVat) {
+        bidder.vatNumber = '';
+      } else {
+        const normalizedVat = normalizeVatNumber(trimmedVat);
+        if (!normalizedVat) {
+          res.status(400).json({ error: 'Ongeldig btw-nummer (bv. BE 0544.963.123).' });
+          return;
+        }
+        bidder.vatNumber = normalizedVat;
       }
-      bidder.vatNumber = normalizedVat;
     }
     if (typeof req.body?.email === 'string') {
       bidder.email = req.body.email.trim().slice(0, 120);
@@ -958,6 +955,13 @@ async function startServer(): Promise<void> {
     if (artwork.status !== 'live') {
       res.status(409).json({
         error: `Biedingen zijn momenteel gesloten voor Lot ${artwork.lotNumber}.`,
+      });
+      return;
+    }
+
+    if (!rawBidderNumber) {
+      res.status(400).json({
+        error: 'Biednummer is verplicht om een bod uit te brengen (bijvoorbeeld #027).',
       });
       return;
     }

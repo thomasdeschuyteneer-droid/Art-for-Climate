@@ -108,7 +108,12 @@ function AuctionShell() {
           />
         )}
         {route.view === 'gallery' && <ArtworkGallery onNavigate={navigate} />}
-        {route.view === 'favorites' && <FavoritesView onNavigate={navigate} />}
+        {route.view === 'favorites' && (
+          <FavoritesView
+            onNavigate={navigate}
+            onOpenBidderModal={() => setBidderModalOpen(true)}
+          />
+        )}
         {route.view === 'artwork' && (
           <ArtworkDetail
             artworkId={route.artworkId}
@@ -247,6 +252,10 @@ function AuctionShell() {
       <BidderModal
         open={bidderModalOpen}
         onClose={() => setBidderModalOpen(false)}
+        onNavigateFavorites={() => {
+          setBidderModalOpen(false);
+          navigate({ view: 'favorites' });
+        }}
       />
       <AdminLoginModal
         open={adminLoginOpen}

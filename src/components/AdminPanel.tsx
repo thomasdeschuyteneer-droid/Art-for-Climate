@@ -1796,11 +1796,10 @@ export function AdminPanel() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-[#363E49] mb-1">
-                    Bedrijfsnaam / Organisatie
+                    Bedrijfsnaam / Organisatie (optioneel)
                   </label>
                   <input
                     type="text"
-                    required
                     value={editingBilling.companyName}
                     onChange={(e) =>
                       setEditingBilling({ ...editingBilling, companyName: e.target.value })
@@ -1810,11 +1809,10 @@ export function AdminPanel() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#363E49] mb-1">
-                    BTW-nummer
+                    BTW-nummer (optioneel)
                   </label>
                   <input
                     type="text"
-                    required
                     value={editingBilling.vatNumber}
                     onChange={(e) =>
                       setEditingBilling({ ...editingBilling, vatNumber: e.target.value })

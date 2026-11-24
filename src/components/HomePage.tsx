@@ -266,7 +266,7 @@ export function HomePage({ onNavigate, onOpenBidderModal }: HomePageProps) {
                 Spelregels ter plekke
               </p>
               <ul className="mt-3 space-y-2.5 text-sm text-[#363E49]">
-                <li>1. Schrijf je in en ontvang een persoonlijk biedernummer (#001).</li>
+                <li>1. Ontvang bij aankomst jouw bordje met biednummer (#027) en schrijf je daarmee in.</li>
                 <li>2. Scan de QR-code bij een werk in Antichambre of Forum, of bied via de zaalveiling.</li>
                 <li>3. Elk nieuw bod moet strikt hoger zijn dan het huidige hoogste bod.</li>
               </ul>
