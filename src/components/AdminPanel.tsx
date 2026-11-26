@@ -45,7 +45,7 @@ const EMPTY_FORM = {
   category: 'Schilderkunst',
   medium: '',
   dimensions: '',
-  galleryRoom: 'Forum',
+  galleryRoom: 'Antichambre Deel 1',
   plinthCode: 'Positie 01',
   provenance: 'Geschonken voor Leuven 2030 — Art for Climate in M Leuven.',
   climateImpact: '100% van de opbrengst gaat naar het Leuvens Klimaatfonds.',
@@ -255,7 +255,7 @@ export function AdminPanel() {
       category: lot.category,
       medium: lot.medium,
       dimensions: lot.dimensions,
-      galleryRoom: lot.galleryRoom || 'Forum',
+      galleryRoom: lot.galleryRoom || 'Antichambre Deel 1',
       plinthCode: lot.plinthCode || 'Positie 01',
       provenance: lot.provenance,
       climateImpact: lot.climateImpact,
@@ -1398,7 +1398,7 @@ export function AdminPanel() {
                   Grondplan opladen
                 </h2>
                 <p className="text-sm text-[#5D6C7B] mt-2 leading-relaxed">
-                  Laad het grondplan van M Leuven (PNG, JPG of WEBP) op. Bezoekers zien dit samen met het interactieve L-vormige schema (Antichambre Deel 1, Antichambre Deel 2 en Forum).
+                  Laad het grondplan van M Leuven (PNG, JPG of WEBP) op. Bezoekers zien dit samen met het interactieve L-vormige schema (kunstwerken gemixed in Antichambre Deel 1 en 2, en enkel de live veiling in het Forum).
                 </p>
               </div>
 

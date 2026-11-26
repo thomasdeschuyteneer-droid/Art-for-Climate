@@ -49,7 +49,7 @@ export function LiveRoom({ onNavigate }: LiveRoomProps) {
       <section className="bg-white border-b border-[#E5E5E5]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-xs font-bold uppercase tracking-widest text-[#19706D]">
-            M Leuven · Live veiling · 16 december 2026
+            M Leuven · Forum · Live veiling · 16 december 2026
           </div>
           {auctionState?.announcement && (
             <p className="text-xs sm:text-sm text-[#363E49] max-w-2xl">
@@ -153,14 +153,14 @@ export function LiveRoom({ onNavigate }: LiveRoomProps) {
           <div className="lg:col-span-5 space-y-6">
             <div className="border border-[#E5E5E5] rounded-2xl bg-white p-5 sm:p-6 space-y-3">
               <h2 className="font-display text-xl font-bold text-[#19706D] border-b border-[#E5E5E5] pb-3">
-                Live zaalveiling · Spelregels
+                Live zaalveiling in het Forum
               </h2>
               <ul className="text-sm text-[#363E49] space-y-2.5 leading-relaxed">
                 <li>
-                  <span className="font-bold text-[#19706D]">1.</span> Alle werken worden op 16 december vanaf 16:00 live geveild in M Leuven.
+                  <span className="font-bold text-[#19706D]">1.</span> In het <span className="font-semibold">Forum</span> vindt op 16 december vanaf 16:00 uitsluitend de live veiling plaats.
                 </li>
                 <li>
-                  <span className="font-bold text-[#19706D]">2.</span> Elk werk vermeldt enkel zijn <span className="font-semibold">startprijs</span>; online of rechtstreeks bieden is niet mogelijk.
+                  <span className="font-bold text-[#19706D]">2.</span> Alle schilderijen en werken hangen gemixed tussen <span className="font-semibold">Antichambre Deel 1</span> en <span className="font-semibold">Antichambre Deel 2</span> en vermelden enkel hun startprijs; online bieden is niet mogelijk.
                 </li>
                 <li>
                   <span className="font-bold text-[#19706D]">3.</span> Bewaar je favoriete werken met het hartje zodat je ze tijdens de zaalveiling snel bij de hand hebt.

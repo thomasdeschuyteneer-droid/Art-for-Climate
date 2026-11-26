@@ -51,7 +51,7 @@ export function buildInitialSeedSnapshot(): AuctionSnapshot {
       category: item.category || 'Beeldende kunst',
       medium: item.medium || 'Kunstwerk uit de catalogus',
       dimensions: item.dimensions || 'Zie catalogus',
-      galleryRoom: item.galleryRoom || 'Forum',
+      galleryRoom: item.galleryRoom || 'Antichambre Deel 1',
       plinthCode: item.plinthCode || `Positie ${item.lotNumber}`,
       provenance: 'Geschonken voor Leuven 2030 — Art for Climate in M Leuven.',
       climateImpact:
@@ -87,7 +87,7 @@ export function buildInitialSeedSnapshot(): AuctionSnapshot {
     lotTimerEndsAt: null,
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
-      'Welkom in M Leuven. Ontdek alle kunstwerken, bewaar je favorieten en bied live in de zaal op 16 december ten voordele van het Leuvens Klimaatfonds.',
+      'Welkom in M Leuven. Ontdek alle kunstwerken gemixed in Antichambre Deel 1 en 2, bewaar je favorieten en bied op 16 december live in het Forum ten voordele van het Leuvens Klimaatfonds.',
     catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
     publicBaseUrl:

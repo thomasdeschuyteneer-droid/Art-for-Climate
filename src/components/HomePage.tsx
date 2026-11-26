@@ -133,7 +133,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 Locatie M Leuven
               </p>
               <p className="font-display text-xl font-bold text-[#1E5941] mt-1">
-                Antichambre &amp; Forum
+                Antichambre 1 &amp; 2 · Forum (live)
               </p>
             </div>
             <div className="py-6 pr-4 lg:px-6">
@@ -263,9 +263,9 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 Spelregels in M Leuven
               </p>
               <ul className="mt-3 space-y-2.5 text-sm text-[#363E49]">
-                <li>1. Bekijk alle kunstwerken in de catalogus of scan de QR-code bij een werk in Antichambre of Forum.</li>
+                <li>1. Bekijk alle kunstwerken in de catalogus of scan de QR-code bij een werk in Antichambre Deel 1 of 2.</li>
                 <li>2. Tik op het hartje om je favoriete werken bij te houden voor de veiling.</li>
-                <li>3. Bieden gebeurt uitsluitend live in de zaal op 16 december — online bieden is niet mogelijk.</li>
+                <li>3. De live veiling vindt uitsluitend plaats in het Forum op 16 december — online bieden is niet mogelijk.</li>
               </ul>
             </div>
             <button

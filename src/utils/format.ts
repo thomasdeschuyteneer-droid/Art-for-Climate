@@ -170,5 +170,4 @@ export function getSuggestedMinimumBid(
 export const M_LEUVEN_ROOMS = [
   'Antichambre Deel 1',
   'Antichambre Deel 2',
-  'Forum',
 ] as const;

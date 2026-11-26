@@ -202,7 +202,7 @@ function createInitialSeed(): AuctionDB {
       category: item.category || 'Beeldende kunst',
       medium: item.medium || 'Kunstwerk uit de catalogus',
       dimensions: item.dimensions || 'Zie catalogus',
-      galleryRoom: item.galleryRoom || 'Forum',
+      galleryRoom: item.galleryRoom || 'Antichambre Deel 1',
       plinthCode: item.plinthCode || `Positie ${item.lotNumber}`,
       provenance: 'Geschonken voor Leuven 2030 — Art for Climate in M Leuven.',
       climateImpact:
@@ -240,7 +240,7 @@ function createInitialSeed(): AuctionDB {
     lotTimerEndsAt: null,
     lotTimerRemainingSeconds: defaultDuration,
     announcement:
-      'Welkom in M Leuven. Ontdek alle kunstwerken, bewaar je favorieten en bied live in de zaal op 16 december ten voordele van het Leuvens Klimaatfonds.',
+      'Welkom in M Leuven. Ontdek alle kunstwerken gemixed in Antichambre Deel 1 en 2, bewaar je favorieten en bied op 16 december live in het Forum ten voordele van het Leuvens Klimaatfonds.',
     catalogPdfName: 'LEUVEN2030_catalogus_kunstveiling_v12.pdf',
     floorplanImageUrl: null,
     publicBaseUrl:
@@ -298,8 +298,22 @@ function loadDB(): AuctionDB {
       fs.writeFileSync(DB_FILE, JSON.stringify(seeded, null, 2), 'utf-8');
       return seeded;
     }
+    let changed = false;
     if (parsed.auctionState?.slogan === 'Kunst vandaag. Impact morgen.') {
       parsed.auctionState.slogan = 'Meer kunst, meer toekomst';
+      changed = true;
+    }
+    if (Array.isArray(parsed.artworks)) {
+      for (const lot of parsed.artworks) {
+        if (lot.galleryRoom === 'Forum') {
+          const assigned = assignRoomForLot(lot.lotNumber, lot.medium || '');
+          lot.galleryRoom = assigned.galleryRoom;
+          lot.plinthCode = assigned.plinthCode;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
       fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
     }
     return parsed;
@@ -475,18 +489,11 @@ function getEffectiveRemainingSeconds(state: AuctionState): number {
   return Math.max(0, diff);
 }
 
-function assignRoomForLot(lotNumber: number, medium: string): { galleryRoom: string; plinthCode: string } {
-  if (/huiskamerconcert|improvisatietheater|concert/i.test(medium)) {
-    return { galleryRoom: 'Forum', plinthCode: `Forum · Podiumbord ${lotNumber}` };
-  }
-  const mod = lotNumber % 3;
-  if (mod === 1) {
+function assignRoomForLot(lotNumber: number, _medium: string): { galleryRoom: string; plinthCode: string } {
+  if (lotNumber % 2 === 0) {
     return { galleryRoom: 'Antichambre Deel 1', plinthCode: `Antichambre 1 · Positie ${lotNumber}` };
   }
-  if (mod === 2) {
-    return { galleryRoom: 'Antichambre Deel 2', plinthCode: `Antichambre 2 · Positie ${lotNumber}` };
-  }
-  return { galleryRoom: 'Forum', plinthCode: `Forum · Positie ${lotNumber}` };
+  return { galleryRoom: 'Antichambre Deel 2', plinthCode: `Antichambre 2 · Positie ${lotNumber}` };
 }
 
 function parseCatalogPagesToLots(pages: string[]): Array<Partial<Artwork>> {
@@ -1078,7 +1085,7 @@ async function startServer(): Promise<void> {
       category: (typeof req.body?.category === 'string' ? req.body.category.trim() : 'Beeldende kunst').slice(0, 60),
       medium: (typeof req.body?.medium === 'string' ? req.body.medium.trim() : 'Kunstwerk uit de catalogus').slice(0, 160),
       dimensions: (typeof req.body?.dimensions === 'string' ? req.body.dimensions.trim() : 'Zie catalogus').slice(0, 80),
-      galleryRoom: (typeof req.body?.galleryRoom === 'string' ? req.body.galleryRoom.trim() : 'Forum').slice(0, 60),
+      galleryRoom: (typeof req.body?.galleryRoom === 'string' ? req.body.galleryRoom.trim() : 'Antichambre Deel 1').slice(0, 60),
       plinthCode: (typeof req.body?.plinthCode === 'string' ? req.body.plinthCode.trim() : `Positie ${lotNumber}`).slice(0, 60),
       provenance: (typeof req.body?.provenance === 'string' ? req.body.provenance.trim() : 'Geschonken voor Leuven 2030 — Art for Climate in M Leuven.').slice(0, 200),
       climateImpact: (typeof req.body?.climateImpact === 'string' ? req.body.climateImpact.trim() : '100% ten voordele van het Leuvens Klimaatfonds.').slice(0, 240),
@@ -1246,7 +1253,7 @@ async function startServer(): Promise<void> {
           category: seedMatch?.category || 'Beeldende kunst',
           medium: item.medium || 'Kunstwerk uit de catalogus',
           dimensions: item.dimensions || 'Zie catalogus',
-          galleryRoom: item.galleryRoom || 'Forum',
+          galleryRoom: item.galleryRoom || 'Antichambre Deel 1',
           plinthCode: item.plinthCode || `Positie ${lotNumber}`,
           provenance: `Geïmporteerd uit ${fileName} voor Leuven 2030.`,
           climateImpact: '100% van de opbrengst ondersteunt het Leuvens Klimaatfonds.',

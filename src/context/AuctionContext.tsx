@@ -800,7 +800,7 @@ export function AuctionProvider({ children }: { children: React.ReactNode }) {
           category: payload.category || 'Beeldende kunst',
           medium: payload.medium || 'Kunstwerk',
           dimensions: payload.dimensions || 'Zie catalogus',
-          galleryRoom: payload.galleryRoom || 'Forum',
+          galleryRoom: payload.galleryRoom || 'Antichambre Deel 1',
           plinthCode: payload.plinthCode || `Positie ${lotNumber}`,
           provenance: payload.provenance || 'Leuven 2030 — Art for Climate.',
           climateImpact: payload.climateImpact || 'Ten voordele van het Leuvens Klimaatfonds.',

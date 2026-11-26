@@ -22,7 +22,6 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
     const counts: Record<string, number> = {
       'Antichambre Deel 1': 0,
       'Antichambre Deel 2': 0,
-      Forum: 0,
     };
     for (const lot of artworks) {
       if (lot.galleryRoom in counts) {
@@ -43,10 +42,6 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
   );
   const antichambre2Lots = useMemo(
     () => artworks.filter((a) => a.galleryRoom === 'Antichambre Deel 2'),
-    [artworks]
-  );
-  const forumLots = useMemo(
-    () => artworks.filter((a) => a.galleryRoom === 'Forum'),
     [artworks]
   );
 
@@ -80,7 +75,7 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
             Grondplan M Leuven
           </h1>
           <p className="text-sm text-[#5D6C7B] mt-2 max-w-2xl">
-            De L-vormige tentoonstellingsopstelling van Art for Climate loopt door Antichambre Deel 1, Antichambre Deel 2 en het Forum. Klik op een zaal of lotnummer om het kunstwerk en de startprijs te bekijken.
+            Alle kunstwerken en schilderijen zijn gemixed tentoongesteld in Antichambre Deel 1 en Antichambre Deel 2. In het Forum vindt uitsluitend de live veiling plaats. Klik op een zaal of lotnummer om het kunstwerk en de startprijs te bekijken.
           </p>
         </div>
 
@@ -205,29 +200,33 @@ export function FloorplanView({ onNavigate }: FloorplanViewProps) {
               {renderZoneLots(antichambre2Lots)}
             </div>
 
-            {/* Rechteronder-vleugel van de L: Forum */}
-            <div
-              onClick={() =>
-                setSelectedRoom(selectedRoom === 'Forum' ? 'Alle zalen' : 'Forum')
-              }
-              className={`lg:col-span-7 rounded-xl border-2 p-5 transition-colors cursor-pointer ${
-                selectedRoom === 'Forum'
-                  ? 'border-[#19706D] bg-[#F0F3E1]'
-                  : 'border-[#1E5941]/40 bg-[#F0F3E1]/40 hover:border-[#19706D]'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 pb-2 border-b border-[#E5E5E5]">
-                <h3 className="font-display text-lg font-bold text-[#1E5941]">
-                  Forum (Live veilingzaal)
-                </h3>
-                <span className="font-mono text-xs font-bold text-[#1E5941] tabular-nums">
-                  {roomCounts['Forum']} werken &amp; concerten
-                </span>
+            {/* Rechteronder-vleugel van de L: Forum (Enkel live veiling) */}
+            <div className="lg:col-span-7 rounded-xl border-2 border-[#1E5941]/40 bg-[#F0F3E1]/50 p-5 flex flex-col justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#1E5941]/20">
+                  <h3 className="font-display text-lg font-bold text-[#1E5941]">
+                    Forum · Enkel live veiling
+                  </h3>
+                  <span className="font-mono text-xs font-bold text-[#1E5941] tabular-nums">
+                    Geen tentoongestelde werken
+                  </span>
+                </div>
+                <p className="text-sm text-[#363E49] mt-3 leading-relaxed">
+                  In het Forum hangen geen kunstwerken: hier vindt op 16 december vanaf 16:00 uitsluitend de live veiling plaats. Alle werken uit de catalogus zijn gemixed te bezichtigen in Antichambre Deel 1 en Antichambre Deel 2.
+                </p>
               </div>
-              <p className="text-xs text-[#5D6C7B] mt-2">
-                Hoofdruimte voor de live veiling, kunstwerken en huiskamerconcerten
-              </p>
-              {renderZoneLots(forumLots)}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <span className="text-xs font-semibold text-[#5D6C7B]">
+                  Live zaal · 16 december 2026
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate({ view: 'live' })}
+                  className="min-h-[40px] px-4 py-2 rounded-[10px] bg-[#1E5941] hover:bg-[#19706D] text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Ga naar Live veiling
+                </button>
+              </div>
             </div>
           </div>
         </div>
