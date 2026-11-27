@@ -111,5 +111,6 @@ export interface AdminAuthStatus {
   authenticated: boolean;
   username: string | null;
   serverReachable?: boolean;
+  authMode?: 'supabase' | 'server';
 }
 

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Lock, X } from 'lucide-react';
 import { useAuction } from '../context/AuctionContext';
 
+import { isSupabaseConfigured } from '../lib/supabase';
+
 interface AdminAuthFormProps {
   targetLabel?: string;
   onSuccess?: () => void;
@@ -18,8 +20,9 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
     void refreshAuthStatus();
   }, [refreshAuthStatus]);
 
-  const isConfigured = authStatus.configured;
-  const serverReachable = authStatus.serverReachable !== false;
+  const isSupabaseMode = authStatus.authMode === 'supabase' || isSupabaseConfigured;
+  const isConfigured = isSupabaseMode ? true : authStatus.configured;
+  const serverReachable = isSupabaseMode ? true : authStatus.serverReachable !== false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,14 +40,26 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
     }
   };
 
+  const isStaticShareHost =
+    typeof window !== 'undefined' && window.location.hostname.startsWith('ais-pre-');
+  const activeLiveUrl = isStaticShareHost
+    ? window.location.href.replace('://ais-pre-', '://ais-dev-')
+    : null;
+
   return (
     <div>
       <p className="text-xs text-[#5D6C7B] leading-relaxed">
         Deze omgeving ({targetLabel}) is uitsluitend toegankelijk voor de beheerder van Leuven 2030. Nieuwe beheerdersaccounts aanmaken is uitgeschakeld.
       </p>
 
-      {!isConfigured && (
-        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed space-y-2">
+      {isSupabaseMode && (
+        <p className="mt-3 text-xs font-medium text-[#19706D] bg-[#DEE9EC]/60 border border-[#19706D]/20 rounded-xl px-3.5 py-2.5 leading-relaxed">
+          Meld je aan met je Supabase-beheerdersaccount. Alle wijzigingen synchroniseren live via Supabase Realtime.
+        </p>
+      )}
+
+      {!isSupabaseMode && !isConfigured && (
+        <div className="mt-4 p-3.5 rounded-xl bg-[#923636]/10 border border-[#923636]/30 text-xs font-semibold text-[#923636] leading-relaxed space-y-2.5">
           {serverReachable ? (
             <>
               <p>
@@ -58,18 +73,28 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
           ) : (
             <>
               <p>
-                Alleen voorbeeldweergave (geen live veilingserver op deze link).
+                Alleen voorbeeldweergave (geen live server op deze statische deellink).
               </p>
               <p className="font-normal text-[#363E49]">
-                Op deze statische deellink draait geen server, waardoor beheerderstoegang en live biedingen niet actief zijn. Open de actieve live app-omgeving of zet de app live via <strong>Deploy</strong>.
+                Op deze statische deellink draait geen server voor beheerderstoegang. Open de actieve live app-omgeving of koppel een Supabase-project via Secrets.
               </p>
-              <button
-                type="button"
-                onClick={() => void refreshAuthStatus()}
-                className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white border border-[#923636]/30 text-[11px] font-bold text-[#923636] hover:bg-[#F7F7F7] cursor-pointer"
-              >
-                Opnieuw controleren
-              </button>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                {activeLiveUrl && (
+                  <a
+                    href={activeLiveUrl}
+                    className="inline-flex items-center px-3 py-1.5 rounded-lg bg-[#19706D] hover:bg-[#1E5941] text-white text-[11px] font-bold transition-colors"
+                  >
+                    Open actieve beheeromgeving
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void refreshAuthStatus()}
+                  className="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-white border border-[#923636]/30 text-[11px] font-bold text-[#923636] hover:bg-[#F7F7F7] cursor-pointer"
+                >
+                  Opnieuw controleren
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -78,16 +103,16 @@ function AdminAuthForm({ targetLabel = 'Beheer', onSuccess }: AdminAuthFormProps
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         <div>
           <label htmlFor="admin-username" className="block text-xs font-bold text-[#363E49] mb-1.5">
-            Gebruikersnaam
+            {isSupabaseMode ? 'E-mailadres' : 'Gebruikersnaam'}
           </label>
           <input
             id="admin-username"
-            type="text"
+            type={isSupabaseMode ? 'email' : 'text'}
             required
-            autoComplete="username"
+            autoComplete={isSupabaseMode ? 'email' : 'username'}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Gebruikersnaam"
+            placeholder={isSupabaseMode ? 'thomas.deschuyteneer@leuven.be' : 'Gebruikersnaam'}
             className="w-full min-h-[44px] px-3.5 py-2 text-sm rounded-[12px] border border-[#E5E5E5] bg-white text-[#363E49] focus:outline-none focus:border-[#19706D]"
           />
         </div>
